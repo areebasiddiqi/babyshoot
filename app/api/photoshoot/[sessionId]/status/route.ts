@@ -48,13 +48,12 @@ export async function POST(
 
     try {
       const astriaStatus = await AstriaAPI.getTrainingStatus(photoshootSession.training_job_id)
-      console.log('Astria status:', astriaStatus)
-
       let newStatus = photoshootSession.status
       let modelId = photoshootSession.model_id
 
       // Check if training is completed
-      if (astriaStatus.trained_at && !astriaStatus.failed_at) {
+      const astriaData = astriaStatus as any
+      if (astriaData.trained_at && !astriaData.failed_at) {
         newStatus = 'ready'
         modelId = astriaStatus.id.toString()
         
@@ -68,13 +67,15 @@ export async function POST(
           })
           .eq('id', params.sessionId)
 
+        console.log(`Training completed for session ${params.sessionId}`)
+
         return NextResponse.json({
           status: newStatus,
           model_id: modelId,
           message: 'Training completed! Ready to generate images.',
           astria_data: astriaStatus
         })
-      } else if (astriaStatus.failed_at) {
+      } else if (astriaData.failed_at) {
         newStatus = 'failed'
         
         // Update database
