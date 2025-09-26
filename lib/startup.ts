@@ -1,17 +1,15 @@
-import { statusChecker } from './statusChecker'
-
-// Initialize the status checker when the app starts
+// Initialize the application
 export function initializeApp() {
   console.log('🚀 Initializing BabyShoot AI application...')
   
-  // Start the automatic status checker
-  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_STATUS_CHECKER === 'true') {
-    console.log('🔄 Starting automatic status checker...')
-    statusChecker.start()
-  } else {
-    console.log('⏸️ Status checker disabled in development mode')
-    console.log('💡 Set ENABLE_STATUS_CHECKER=true to enable in development')
-  }
+  // Note: Interval-based status checking is disabled for serverless deployments
+  // Use the following alternatives instead:
+  // 1. Client-side polling (already implemented in usePhotoshootStatus hook)
+  // 2. External cron service calling /api/status/check-all
+  // 3. Webhook-based updates from Astria
+  
+  console.log('✅ Application initialized for serverless deployment')
+  console.log('💡 Status checking handled by client-side polling and webhooks')
 }
 
 // Auto-initialize when this module is imported

@@ -22,11 +22,7 @@ export function usePhotoshootStatus(sessionId: string | null, initialStatus: str
   const checkStatus = useCallback(async () => {
     if (!sessionId) return
 
-    // Don't check if already completed or failed
-    if (photoshootStatus.status === 'completed' || photoshootStatus.status === 'failed') {
-      return
-    }
-
+    console.log(`🔍 Checking status for session ${sessionId}`)
     setIsChecking(true)
     setError(null)
 
@@ -38,56 +34,69 @@ export function usePhotoshootStatus(sessionId: string | null, initialStatus: str
 
       if (response.ok) {
         const data = await response.json()
+        console.log(`📊 Status check response:`, data)
         
-        setPhotoshootStatus(prev => ({
-          ...prev,
-          status: data.session.status,
-          modelId: data.session.model_id,
-          images: data.images,
-          message: data.updated ? 'Status updated automatically' : undefined
-        }))
+        setPhotoshootStatus(prev => {
+          // Don't update if already completed or failed
+          if (prev.status === 'completed' || prev.status === 'failed') {
+            return prev
+          }
+          
+          return {
+            ...prev,
+            status: data.session.status,
+            modelId: data.session.model_id,
+            images: data.images,
+            message: data.updated ? 'Status updated automatically' : 'Status checked'
+          }
+        })
 
         if (data.updated) {
-          console.log('Status automatically updated:', data.updates)
+          console.log('✅ Status automatically updated:', data.status)
         }
+      } else {
+        console.error('❌ Status check failed:', response.status, response.statusText)
       }
 
     } catch (err: any) {
-      console.error('Failed to check photoshoot status:', err)
+      console.error('❌ Failed to check photoshoot status:', err)
       setError(err.message)
     } finally {
       setIsChecking(false)
     }
-  }, [sessionId, photoshootStatus.status])
+  }, [sessionId])
 
   // Auto-check status based on current state
   useEffect(() => {
     if (!sessionId) return
 
-    // Don't poll if completed or failed
-    if (photoshootStatus.status === 'completed' || photoshootStatus.status === 'failed') {
-      return
-    }
-
     // Check immediately
     checkStatus()
 
-    // Set different polling intervals based on status
-    let interval: NodeJS.Timeout
-    
-    if (photoshootStatus.status === 'training') {
-      // Check every 30 seconds for training (slower process)
-      interval = setInterval(checkStatus, 30000)
-    } else if (photoshootStatus.status === 'generating') {
-      // Check every 10 seconds for generation (faster process)
-      interval = setInterval(checkStatus, 10000)
-    } else {
-      // Check every 5 seconds for other states
-      interval = setInterval(checkStatus, 5000)
-    }
+    // Set up polling interval
+    const interval = setInterval(() => {
+      // Check current status before polling
+      setPhotoshootStatus(currentStatus => {
+        // Don't poll if completed or failed
+        if (currentStatus.status === 'completed' || currentStatus.status === 'failed') {
+          console.log(`⏹️ Stopping polling for session ${sessionId} - status: ${currentStatus.status}`)
+          return currentStatus
+        }
+        
+        // Continue polling
+        console.log(`⏰ Polling interval triggered for session ${sessionId}`)
+        checkStatus()
+        return currentStatus
+      })
+    }, 60000) // Every minute
 
-    return () => clearInterval(interval)
-  }, [sessionId, checkStatus, photoshootStatus.status])
+    console.log(`🔄 Started polling for session ${sessionId}`)
+
+    return () => {
+      console.log(`🛑 Stopped polling for session ${sessionId}`)
+      clearInterval(interval)
+    }
+  }, [sessionId, checkStatus])
 
   return {
     status: photoshootStatus.status,
