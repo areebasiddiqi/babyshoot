@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useAuth } from '@/components/AuthProvider'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
@@ -27,7 +27,7 @@ const steps = [
 
 // Themes will be loaded from API
 
-export default function CreatePhotoshootPage() {
+function CreatePhotoshootContent() {
   const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -713,5 +713,17 @@ export default function CreatePhotoshootPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function CreatePhotoshootPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    }>
+      <CreatePhotoshootContent />
+    </Suspense>
   )
 }
