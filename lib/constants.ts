@@ -64,8 +64,8 @@ export const MIN_PHOTOS_REQUIRED = 3
 export const MAX_PHOTOS_ALLOWED = 10
 
 export const POLLING_INTERVALS = {
-  TRAINING: 10000, // 10 seconds
-  GENERATING: 5000, // 5 seconds
+  TRAINING: 60000, // 1 minute (60 seconds)
+  GENERATING: 60000, // 1 minute (60 seconds)
   COMPLETED: 0 // No polling
 } as const
 

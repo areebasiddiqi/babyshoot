@@ -28,29 +28,45 @@ export default function SessionView({ session: initialSession }: SessionViewProp
   useEffect(() => {
     // Poll for updates if session is in progress
     if (session.status === 'training' || session.status === 'generating') {
+      console.log(`🔄 Starting polling for session ${session.id} - status: ${session.status}`)
+      
       const interval = setInterval(async () => {
         try {
-          const response = await fetch(`/api/photoshoot/${session.id}`)
+          console.log(`⏰ Polling session ${session.id} for status updates`)
+          
+          // Use the auto-update endpoint for better status checking
+          const response = await fetch(`/api/photoshoot/${session.id}/auto-update`, {
+            method: 'POST'
+          })
+          
           if (response.ok) {
-            const updatedSession = await response.json()
-            setSession(updatedSession)
+            const data = await response.json()
+            console.log(`📊 Session polling response:`, data)
+            
+            setSession(data.session)
             
             // Stop polling if completed or failed
-            if (updatedSession.status === 'completed' || updatedSession.status === 'failed') {
+            if (data.session.status === 'completed' || data.session.status === 'failed') {
+              console.log(`⏹️ Stopping session polling - status: ${data.session.status}`)
               clearInterval(interval)
               setPollingInterval(null)
             }
+            
+            if (data.updated) {
+              console.log(`✅ Session status updated: ${data.session.status}`)
+            }
           }
         } catch (error) {
-          console.error('Failed to poll session status:', error)
+          console.error('❌ Failed to poll session status:', error)
         }
-      }, 5000) // Poll every 5 seconds
+      }, 60000) // Poll every minute (60 seconds)
 
       setPollingInterval(interval)
     }
 
     return () => {
       if (pollingInterval) {
+        console.log(`🛑 Cleaning up session polling for ${session.id}`)
         clearInterval(pollingInterval)
       }
     }
@@ -67,11 +83,13 @@ export default function SessionView({ session: initialSession }: SessionViewProp
 
       if (response.ok) {
         toast.success('Image generation started!')
-        // Refresh session data
-        const updatedResponse = await fetch(`/api/photoshoot/${session.id}`)
+        // Refresh session data using auto-update endpoint
+        const updatedResponse = await fetch(`/api/photoshoot/${session.id}/auto-update`, {
+          method: 'POST'
+        })
         if (updatedResponse.ok) {
-          const updatedSession = await updatedResponse.json()
-          setSession(updatedSession)
+          const data = await updatedResponse.json()
+          setSession(data.session)
         }
       } else {
         const error = await response.json()
