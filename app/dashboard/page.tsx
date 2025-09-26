@@ -121,6 +121,25 @@ export default async function DashboardPage() {
           </p>
         </div>
 
+        {/* Model Reuse Tip */}
+        {sessions && sessions.some((session: any) => session.status === 'completed') && (
+          <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <span className="text-blue-500">💡</span>
+              </div>
+              <div className="ml-3">
+                <h4 className="text-sm font-medium text-blue-800 mb-1">
+                  Pro Tip: Save Time & Money
+                </h4>
+                <p className="text-sm text-blue-700">
+                  Create multiple photoshoots with different themes for the same child within 30 days to reuse the AI model - no retraining needed!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="card">

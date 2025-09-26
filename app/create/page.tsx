@@ -192,7 +192,12 @@ function CreatePhotoshootContent() {
 
       const result = await response.json()
       
-      toast.success('Photoshoot created! Training your AI model...')
+      if (result.modelReused) {
+        toast.success('Photoshoot created! Using existing model - ready to generate!')
+      } else {
+        toast.success('Photoshoot created! Training your AI model...')
+      }
+      
       router.push(`/session/${result.sessionId}`)
       
     } catch (error) {

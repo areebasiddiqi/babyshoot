@@ -234,6 +234,25 @@ export default function SessionView({ session: initialSession }: SessionViewProp
             </div>
           </div>
 
+          {/* Model Reuse Indicator - detect by marker in base_prompt */}
+          {session.base_prompt?.includes('[MODEL_REUSED]') && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <span className="text-green-500">♻️</span>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-green-800">
+                    Model Reused
+                  </p>
+                  <p className="text-xs text-green-600">
+                    Using existing AI model for faster processing and cost savings
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Session Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div>

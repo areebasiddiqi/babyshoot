@@ -156,3 +156,22 @@ export function generateSessionId(): string {
 export function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
+
+// Model reuse utilities
+export function isModelValid(updatedAt: string, daysValid: number = 30): boolean {
+  const modelDate = new Date(updatedAt)
+  const expirationDate = new Date(modelDate.getTime() + (daysValid * 24 * 60 * 60 * 1000))
+  return new Date() < expirationDate
+}
+
+export function getModelExpirationDate(updatedAt: string, daysValid: number = 30): Date {
+  const modelDate = new Date(updatedAt)
+  return new Date(modelDate.getTime() + (daysValid * 24 * 60 * 60 * 1000))
+}
+
+export function getDaysUntilExpiration(updatedAt: string, daysValid: number = 30): number {
+  const expirationDate = getModelExpirationDate(updatedAt, daysValid)
+  const now = new Date()
+  const diffTime = expirationDate.getTime() - now.getTime()
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+}

@@ -125,17 +125,45 @@ export async function POST(request: NextRequest) {
     const basePrompt = generateBasePrompt(childData)
     const enhancedPrompt = enhancePromptWithTheme(basePrompt, themePrompt)
 
+    // Check for existing valid model for this child (within 30 days)
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const { data: existingModel } = await supabaseAdmin
+      .from('photoshoot_sessions')
+      .select('model_id, training_job_id, uploaded_photos')
+      .eq('child_id', childId)
+      .eq('status', 'completed')
+      .not('model_id', 'is', null)
+      .gte('updated_at', thirtyDaysAgo.toISOString())
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    let reusingModel = false
+    let modelId = null
+    let trainingJobId = null
+    let uploadedPhotos: string[] = []
+
+    if (existingModel) {
+      console.log(`🔄 Reusing existing model ${existingModel.model_id} for child ${childId}`)
+      reusingModel = true
+      modelId = existingModel.model_id
+      trainingJobId = existingModel.training_job_id
+      uploadedPhotos = existingModel.uploaded_photos || []
+    }
+
     // Create photoshoot session (let database generate UUID)
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('photoshoot_sessions')
       .insert({
         user_id: user.id,
         child_id: childId,
-        status: 'pending',
+        status: reusingModel ? 'ready' : 'pending',
         selected_theme_id: themeId,
-        base_prompt: basePrompt,
+        base_prompt: reusingModel ? `[MODEL_REUSED] ${basePrompt}` : basePrompt,
         enhanced_prompt: enhancedPrompt,
-        uploaded_photos: [] // Will be updated after upload
+        uploaded_photos: uploadedPhotos,
+        model_id: modelId,
+        training_job_id: trainingJobId
       })
       .select()
       .single()
@@ -145,81 +173,88 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create photoshoot session' }, { status: 500 })
     }
 
-    // Upload photos to Astria and start training
-    try {
-      const uploadedUrls: string[] = []
-      
-      for (let i = 0; i < photoFiles.length; i++) {
-        const file = photoFiles[i]
-        console.log(`Uploading file ${i + 1}/${photoFiles.length}: ${file.name} (${file.size} bytes)`)
+    // Upload photos and start training (only if not reusing model)
+    if (!reusingModel) {
+      try {
+        const uploadedUrls: string[] = []
         
-        try {
-          const buffer = Buffer.from(await file.arrayBuffer())
+        for (let i = 0; i < photoFiles.length; i++) {
+          const file = photoFiles[i]
+          console.log(`Uploading file ${i + 1}/${photoFiles.length}: ${file.name} (${file.size} bytes)`)
           
-          // Convert image to data URL for Astria API
-          const dataUrl = await AstriaAPI.uploadImage(buffer, file.name)
-          
-          if (!dataUrl) {
-            throw new Error(`Failed to process ${file.name}`)
+          try {
+            const buffer = Buffer.from(await file.arrayBuffer())
+            
+            // Convert image to data URL for Astria API
+            const dataUrl = await AstriaAPI.uploadImage(buffer, file.name)
+            
+            if (!dataUrl) {
+              throw new Error(`Failed to process ${file.name}`)
+            }
+            
+            console.log(`Successfully processed ${file.name}`)
+            uploadedUrls.push(dataUrl)
+          } catch (uploadError: any) {
+            console.error(`Failed to process file ${file.name}:`, uploadError)
+            throw new Error(`Failed to process file ${file.name}: ${uploadError.message}`)
           }
-          
-          console.log(`Successfully processed ${file.name}`)
-          uploadedUrls.push(dataUrl)
-        } catch (uploadError: any) {
-          console.error(`Failed to process file ${file.name}:`, uploadError)
-          throw new Error(`Failed to process file ${file.name}: ${uploadError.message}`)
         }
-      }
 
-      // Update session with uploaded photo URLs
-      await supabaseAdmin
-        .from('photoshoot_sessions')
-        .update({ uploaded_photos: uploadedUrls })
-        .eq('id', session.id)
-
-      // Start fine-tuning with data URLs
-      console.log('Starting Astria fine-tuning with', uploadedUrls.length, 'images')
-      
-      const trainingJob = await AstriaAPI.createFineTuning(uploadedUrls, basePrompt)
-      
-      // Update session with training job info
-      await supabaseAdmin
-        .from('photoshoot_sessions')
-        .update({
-          status: 'training',
-          training_job_id: trainingJob.id
-        })
-        .eq('id', session.id)
-
-      // Update subscription usage
-      if (subscription) {
+        // Update session with uploaded photo URLs
         await supabaseAdmin
-          .from('subscriptions')
-          .update({ 
-            photoshoots_used: subscription.photoshoots_used + 1 
+          .from('photoshoot_sessions')
+          .update({ uploaded_photos: uploadedUrls })
+          .eq('id', session.id)
+
+        // Start fine-tuning with data URLs
+        console.log('Starting Astria fine-tuning with', uploadedUrls.length, 'images')
+        
+        const trainingJob = await AstriaAPI.createFineTuning(uploadedUrls, basePrompt)
+        
+        // Update session with training job info
+        await supabaseAdmin
+          .from('photoshoot_sessions')
+          .update({
+            status: 'training',
+            training_job_id: trainingJob.id
           })
-          .eq('user_id', user.id)
+          .eq('id', session.id)
+      } catch (error: any) {
+        console.error('Training setup error:', error)
+        
+        // Update session status to failed
+        await supabaseAdmin
+          .from('photoshoot_sessions')
+          .update({ status: 'failed' })
+          .eq('id', session.id)
+        
+        return NextResponse.json({ 
+          error: 'Failed to start training',
+          details: error.message 
+        }, { status: 500 })
       }
-
-      return NextResponse.json({ 
-        sessionId: session.id,
-        status: 'training',
-        message: 'Photoshoot created successfully. Training AI model...' 
-      })
-
-    } catch (astriaError) {
-      console.error('Astria API error:', astriaError)
-      
-      // Update session status to failed
-      await supabaseAdmin
-        .from('photoshoot_sessions')
-        .update({ status: 'failed' })
-        .eq('id', session.id)
-
-      return NextResponse.json({ 
-        error: 'Failed to start AI training. Please try again.' 
-      }, { status: 500 })
+    } else {
+      console.log('✅ Skipping training - reusing existing model')
     }
+
+    // Update subscription usage
+    if (subscription) {
+      await supabaseAdmin
+        .from('subscriptions')
+        .update({ 
+          photoshoots_used: subscription.photoshoots_used + 1 
+        })
+        .eq('user_id', user.id)
+    }
+
+    return NextResponse.json({ 
+      sessionId: session.id,
+      status: reusingModel ? 'ready' : 'training',
+      modelReused: reusingModel,
+      message: reusingModel 
+        ? 'Photoshoot created successfully. Model ready for generation!' 
+        : 'Photoshoot created successfully. Training AI model...' 
+    })
 
   } catch (error) {
     console.error('API error:', error)
