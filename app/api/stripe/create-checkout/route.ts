@@ -12,13 +12,13 @@ export async function POST(request: NextRequest) {
     const { createRouteHandlerClient } = await import('@supabase/auth-helpers-nextjs')
     const supabase = createRouteHandlerClient({ cookies })
     
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session: authSession } } = await supabase.auth.getSession()
     
-    if (!session) {
+    if (!authSession) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = session.user
+    const user = authSession.user
 
     if (!supabaseAdmin) {
       return NextResponse.json({ error: 'Database not available' }, { status: 500 })
@@ -42,10 +42,17 @@ export async function POST(request: NextRequest) {
     if (subscription?.stripe_customer_id) {
       stripeCustomerId = subscription.stripe_customer_id
     } else {
+      // Get user profile from database for name
+      const { data: userProfile } = await supabaseAdmin
+        .from('users')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single()
+
       // Create new Stripe customer
       const customer = await stripe.customers.create({
-        email: user.emailAddresses[0]?.emailAddress,
-        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        name: userProfile ? `${userProfile.first_name} ${userProfile.last_name}`.trim() : user.email?.split('@')[0] || 'User',
         metadata: {
           userId: user.id,
         },
@@ -60,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create checkout session
-    const session = await stripe.checkout.sessions.create({
+    const checkoutSession = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       line_items: [
@@ -77,7 +84,7 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ sessionId: session.id })
+    return NextResponse.json({ sessionId: checkoutSession.id })
   } catch (error) {
     console.error('Stripe checkout error:', error)
     return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
