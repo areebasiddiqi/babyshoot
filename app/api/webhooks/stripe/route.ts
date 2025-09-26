@@ -22,6 +22,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
+  if (!supabaseAdmin) {
+    console.error('Supabase admin client not available')
+    return NextResponse.json({ error: 'Database not available' }, { status: 500 })
+  }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
