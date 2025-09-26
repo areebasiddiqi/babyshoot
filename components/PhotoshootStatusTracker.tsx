@@ -2,11 +2,8 @@
 
 import React from 'react'
 import { usePhotoshootStatus } from '@/hooks/useTrainingStatus'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Loader2, CheckCircle, AlertCircle, Clock, Wand2, Image as ImageIcon } from 'lucide-react'
 import Image from 'next/image'
+import LoadingSpinner from './LoadingSpinner'
 
 interface PhotoshootStatusTrackerProps {
   sessionId: string
@@ -43,13 +40,13 @@ export function PhotoshootStatusTracker({
   }, [status, onStatusChange])
 
   const getStatusIcon = () => {
-    if (isChecking) return <Loader2 className="h-4 w-4 animate-spin" />
-    if (isCompleted) return <CheckCircle className="h-4 w-4 text-green-500" />
-    if (isFailed) return <AlertCircle className="h-4 w-4 text-red-500" />
-    if (isTraining) return <Clock className="h-4 w-4 text-blue-500" />
-    if (isGenerating) return <Wand2 className="h-4 w-4 text-purple-500" />
-    if (isReady) return <ImageIcon className="h-4 w-4 text-green-500" />
-    return <Clock className="h-4 w-4 text-gray-500" />
+    if (isChecking) return <LoadingSpinner />
+    if (isCompleted) return <span className="text-green-500">✅</span>
+    if (isFailed) return <span className="text-red-500">❌</span>
+    if (isTraining) return <span className="text-blue-500">🔄</span>
+    if (isGenerating) return <span className="text-purple-500">✨</span>
+    if (isReady) return <span className="text-green-500">🎯</span>
+    return <span className="text-gray-500">⏳</span>
   }
 
   const getStatusColor = () => {
@@ -100,18 +97,18 @@ export function PhotoshootStatusTracker({
   }
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <div className="w-full max-w-2xl mx-auto bg-white rounded-lg shadow-md border">
+      <div className="p-6 border-b">
+        <div className="flex items-center gap-2">
           {getStatusIcon()}
-          Photoshoot Status
-          <Badge className={getStatusColor()}>
+          <h2 className="text-xl font-semibold">Photoshoot Status</h2>
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor()}`}>
             {status.charAt(0).toUpperCase() + status.slice(1)}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
+          </span>
+        </div>
+      </div>
       
-      <CardContent className="space-y-4">
+      <div className="p-6 space-y-4">
         {/* Status Message */}
         <div className="text-sm text-gray-600">
           {getStatusMessage()}
@@ -140,23 +137,23 @@ export function PhotoshootStatusTracker({
 
         {/* Generate Images Button */}
         {isReady && (
-          <Button 
+          <button 
             onClick={generateImages}
-            className="w-full"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isChecking}
           >
             {isChecking ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Starting Generation...
-              </>
+              <span className="flex items-center justify-center">
+                <LoadingSpinner />
+                <span className="ml-2">Starting Generation...</span>
+              </span>
             ) : (
-              <>
-                <Wand2 className="h-4 w-4 mr-2" />
+              <span className="flex items-center justify-center">
+                <span className="mr-2">✨</span>
                 Generate Images
-              </>
+              </span>
             )}
-          </Button>
+          </button>
         )}
 
         {/* Generated Images */}
@@ -175,15 +172,16 @@ export function PhotoshootStatusTracker({
                     />
                   ) : (
                     <div className="w-full h-full bg-gray-200 rounded-lg flex items-center justify-center">
-                      <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                      <LoadingSpinner />
                     </div>
                   )}
-                  <Badge 
-                    className="absolute top-1 right-1 text-xs"
-                    variant={image.status === 'completed' ? 'default' : 'secondary'}
+                  <span 
+                    className={`absolute top-1 right-1 text-xs px-1 py-0.5 rounded ${
+                      image.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}
                   >
                     {image.status}
-                  </Badge>
+                  </span>
                 </div>
               ))}
             </div>
@@ -191,21 +189,20 @@ export function PhotoshootStatusTracker({
         )}
 
         {/* Manual Refresh Button */}
-        <Button 
-          variant="outline" 
+        <button 
           onClick={checkStatus}
           disabled={isChecking}
-          className="w-full"
+          className="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isChecking ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Checking Status...
-            </>
+            <span className="flex items-center justify-center">
+              <LoadingSpinner />
+              <span className="ml-2">Checking Status...</span>
+            </span>
           ) : (
             'Refresh Status'
           )}
-        </Button>
+        </button>
 
         {/* Progress Indicator */}
         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -219,7 +216,7 @@ export function PhotoshootStatusTracker({
             }`}
           />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
