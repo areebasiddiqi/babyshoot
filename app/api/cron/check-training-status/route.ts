@@ -54,7 +54,8 @@ export async function GET(request: NextRequest) {
         let modelId = session.model_id
 
         // Check if training is completed
-        if (astriaStatus.trained_at && !astriaStatus.failed_at) {
+        const astriaData = astriaStatus as any
+        if (astriaData.trained_at && !astriaData.failed_at) {
           newStatus = 'ready'
           modelId = astriaStatus.id.toString()
           
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
             })
           }
 
-        } else if (astriaStatus.failed_at) {
+        } else if (astriaData.failed_at) {
           newStatus = 'failed'
           
           console.log(`❌ Session ${session.id} training failed! Updating to failed status`)
@@ -119,11 +120,11 @@ export async function GET(request: NextRequest) {
 
         } else {
           // Still training
-          console.log(`⏳ Session ${session.id} still training... ETA: ${astriaStatus.eta}`)
+          console.log(`⏳ Session ${session.id} still training... ETA: ${astriaData.eta || 'unknown'}`)
           results.push({
             sessionId: session.id,
             status: 'still_training',
-            eta: astriaStatus.eta
+            eta: astriaData.eta
           })
         }
 
