@@ -8,6 +8,11 @@ export async function POST(request: NextRequest) {
 
     console.log('Astria webhook received:', { type, data })
 
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not available')
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 })
+    }
+
     if (type === 'tune.completed') {
       // Training completed
       const { id: jobId, model_id, status } = data
