@@ -4,6 +4,9 @@ import { Toaster } from 'react-hot-toast'
 import AuthProvider from '@/components/AuthProvider'
 import './globals.css'
 
+// Initialize the status checker on server startup
+import '@/lib/startup'
+
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {

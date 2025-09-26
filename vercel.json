@@ -1,12 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/check-training-status",
-      "schedule": "*/2 * * * *"
-    },
-    {
-      "path": "/api/cron/check-generation-status",
-      "schedule": "*/1 * * * *"
-    }
-  ]
-}
+{}

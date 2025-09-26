@@ -1,35 +1,23 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function GET(request: NextRequest) {
-  const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get('code')
-  const redirectTo = requestUrl.searchParams.get('redirectTo') || '/dashboard'
-
-  if (code) {
+export async function POST(request: NextRequest) {
+  try {
     const { cookies } = await import('next/headers')
+    const { createRouteHandlerClient } = await import('@supabase/auth-helpers-nextjs')
     const supabase = createRouteHandlerClient({ cookies })
     
-    // Exchange code for session
-    const { data: { session }, error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data: { session } } = await supabase.auth.getSession()
     
-    if (session && session.user && !error) {
-      // Create user profile if it doesn't exist
-      await createUserProfile(session.user)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-  }
 
-  // Redirect to the intended destination
-  return NextResponse.redirect(new URL(redirectTo, request.url))
-}
-
-async function createUserProfile(user: any) {
-  try {
     if (!supabaseAdmin) {
-      console.error('Supabase admin client not available')
-      return
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 })
     }
+
+    const user = session.user
 
     // Check if user already exists
     const { data: existingUser } = await supabaseAdmin
@@ -39,8 +27,10 @@ async function createUserProfile(user: any) {
       .single()
 
     if (existingUser) {
-      console.log(`User profile already exists for ${user.email}`)
-      return
+      return NextResponse.json({ 
+        message: 'User profile already exists',
+        user: existingUser 
+      })
     }
 
     // Extract user information
@@ -67,11 +57,24 @@ async function createUserProfile(user: any) {
 
     if (createError) {
       console.error('Failed to create user profile:', createError)
-    } else {
-      console.log(`✅ Created user profile for ${email} (${user.id})`)
+      return NextResponse.json({ 
+        error: 'Failed to create user profile',
+        details: createError.message 
+      }, { status: 500 })
     }
 
-  } catch (error) {
-    console.error('Error creating user profile:', error)
+    console.log(`✅ Created user profile for ${email} (${user.id})`)
+
+    return NextResponse.json({
+      message: 'User profile created successfully',
+      user: newUser
+    })
+
+  } catch (error: any) {
+    console.error('Create profile error:', error)
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      details: error.message 
+    }, { status: 500 })
   }
 }

@@ -63,40 +63,35 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
   const syncUserToDatabase = async (user: User) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .upsert({
-          id: user.id,
-          email: user.email,
-          first_name: user.user_metadata?.first_name || user.user_metadata?.name?.split(' ')[0] || '',
-          last_name: user.user_metadata?.last_name || user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
-          image_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
-          updated_at: new Date().toISOString(),
-        })
+      // Use the sync profile API endpoint for better reliability
+      const response = await fetch('/api/auth/sync-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
 
-      if (error) {
-        console.error('Error syncing user to database:', error)
-      }
-
-      // Create subscription if it doesn't exist
-      const { data: existingSubscription } = await supabase
-        .from('subscriptions')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
-      if (!existingSubscription) {
-        await supabase
-          .from('subscriptions')
-          .insert({
-            user_id: user.id,
-            plan: 'free',
-            status: 'active',
-            photoshoots_used: 0,
-            photoshoots_limit: 1,
-            current_period_start: new Date().toISOString(),
-            current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+      if (!response.ok) {
+        console.error('Failed to sync user profile via API')
+        
+        // Fallback to direct database sync
+        const { error } = await supabase
+          .from('users')
+          .upsert({
+            id: user.id,
+            email: user.email,
+            first_name: user.user_metadata?.first_name || user.user_metadata?.name?.split(' ')[0] || '',
+            last_name: user.user_metadata?.last_name || user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
+            image_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || '',
+            updated_at: new Date().toISOString(),
           })
+
+        if (error) {
+          console.error('Error syncing user to database:', error)
+        }
+      } else {
+        const data = await response.json()
+        console.log('User profile synced successfully:', data.message)
       }
     } catch (error) {
       console.error('Error in syncUserToDatabase:', error)
