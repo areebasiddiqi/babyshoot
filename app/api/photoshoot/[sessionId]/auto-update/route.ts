@@ -36,10 +36,14 @@ export async function POST(
     // Use deployment-friendly status checker
     const result = await DeploymentStatusChecker.checkSession(params.sessionId)
 
-    // Get updated session data
+    // Get updated session data with children and themes
     const { data: updatedSession } = await supabaseAdmin
       .from('photoshoot_sessions')
-      .select('*')
+      .select(`
+        *,
+        children (name, age_in_months),
+        themes (name, description)
+      `)
       .eq('id', params.sessionId)
       .single()
 

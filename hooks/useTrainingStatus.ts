@@ -27,8 +27,11 @@ export function usePhotoshootStatus(sessionId: string | null, initialStatus: str
     setError(null)
 
     try {
+      const endpoint = `/api/photoshoot/${sessionId}/auto-update`
+      console.log(`🌐 Making request to: ${endpoint}`)
+      
       // Use the auto-update endpoint that handles both training and generation
-      const response = await fetch(`/api/photoshoot/${sessionId}/auto-update`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
       })
 

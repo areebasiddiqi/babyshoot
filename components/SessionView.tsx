@@ -32,10 +32,12 @@ export default function SessionView({ session: initialSession }: SessionViewProp
       
       const interval = setInterval(async () => {
         try {
+          const endpoint = `/api/photoshoot/${session.id}/auto-update`
           console.log(`⏰ Polling session ${session.id} for status updates`)
+          console.log(`🌐 SessionView making request to: ${endpoint}`)
           
           // Use the auto-update endpoint for better status checking
-          const response = await fetch(`/api/photoshoot/${session.id}/auto-update`, {
+          const response = await fetch(endpoint, {
             method: 'POST'
           })
           
@@ -126,7 +128,7 @@ export default function SessionView({ session: initialSession }: SessionViewProp
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `${session.children.name}'s AI Photoshoot`,
+          title: `${session.children?.name || 'AI'}'s AI Photoshoot`,
           text: 'Check out this amazing AI-generated photo!',
           url: imageUrl
         })
@@ -214,7 +216,7 @@ export default function SessionView({ session: initialSession }: SessionViewProp
             <div className="flex items-center space-x-2">
               <SparklesIcon className="h-6 w-6 text-primary-500" />
               <span className="font-semibold text-gray-900">
-                {session.children.name}'s Photoshoot
+                {session.children?.name || 'AI'}'s Photoshoot
               </span>
             </div>
           </div>
@@ -236,12 +238,13 @@ export default function SessionView({ session: initialSession }: SessionViewProp
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1">Child</h3>
-              <p className="text-lg font-semibold text-gray-900">{session.children.name}</p>
+              <p className="text-lg font-semibold text-gray-900">{session.children?.name || 'Unknown'}</p>
               <p className="text-sm text-gray-600">
-                {session.children.age_in_months < 12 
-                  ? `${session.children.age_in_months} months old`
-                  : `${Math.floor(session.children.age_in_months / 12)} years old`
-                }
+                {session.children?.age_in_months ? (
+                  session.children.age_in_months < 12 
+                    ? `${session.children.age_in_months} months old`
+                    : `${Math.floor(session.children.age_in_months / 12)} years old`
+                ) : 'Age not specified'}
               </p>
             </div>
             
@@ -346,7 +349,7 @@ export default function SessionView({ session: initialSession }: SessionViewProp
                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100">
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => downloadImage(image.image_url, `${session.children.name}-photo-${index + 1}.jpg`)}
+                          onClick={() => downloadImage(image.image_url, `${session.children?.name || 'ai'}-photo-${index + 1}.jpg`)}
                           className="p-2 bg-white rounded-full shadow-lg hover:bg-gray-50 transition-colors"
                           title="Download"
                         >
@@ -375,7 +378,7 @@ export default function SessionView({ session: initialSession }: SessionViewProp
                       .filter((img: any) => img.status === 'completed')
                       .forEach((img: any, index: number) => {
                         setTimeout(() => {
-                          downloadImage(img.image_url, `${session.children.name}-photo-${index + 1}.jpg`)
+                          downloadImage(img.image_url, `${session.children?.name || 'ai'}-photo-${index + 1}.jpg`)
                         }, index * 500) // Stagger downloads
                       })
                   }}
@@ -394,7 +397,7 @@ export default function SessionView({ session: initialSession }: SessionViewProp
           <div className="card bg-blue-50 border-blue-200">
             <h3 className="text-lg font-medium text-blue-900 mb-3">While you wait...</h3>
             <ul className="text-sm text-blue-800 space-y-2">
-              <li>• We're creating a custom AI model just for {session.children.name}</li>
+              <li>• We're creating a custom AI model just for {session.children?.name || 'your child'}</li>
               <li>• This process usually takes 5-15 minutes</li>
               <li>• You'll get an email notification when it's ready</li>
               <li>• Feel free to close this page and come back later</li>
@@ -406,7 +409,7 @@ export default function SessionView({ session: initialSession }: SessionViewProp
           <div className="card bg-purple-50 border-purple-200">
             <h3 className="text-lg font-medium text-purple-900 mb-3">Creating your photos...</h3>
             <ul className="text-sm text-purple-800 space-y-2">
-              <li>• Our AI is painting beautiful photos of {session.children.name}</li>
+              <li>• Our AI is painting beautiful photos of {session.children?.name || 'your child'}</li>
               <li>• Each image is unique and personalized</li>
               <li>• This takes about 2-5 minutes</li>
               <li>• Images will appear here as they're completed</li>
