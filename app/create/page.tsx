@@ -557,10 +557,12 @@ function CreatePhotoshootContent() {
                           <div>
                             <p className="font-medium text-gray-900">{child.name}</p>
                             <p className="text-sm text-gray-600">
-                              {child.ageInMonths < 12 
-                                ? `${child.ageInMonths} months old`
-                                : `${Math.floor(child.ageInMonths / 12)} years old`
-                              }
+                              {(() => {
+                                const ageInMonths = child.ageInMonths || child.age_in_months || 0
+                                return ageInMonths < 12 
+                                  ? `${ageInMonths} months old`
+                                  : `${Math.floor(ageInMonths / 12)} years old`
+                              })()}
                             </p>
                           </div>
                         </div>
