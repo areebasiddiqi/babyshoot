@@ -35,7 +35,8 @@ CREATE TABLE themes (
   description TEXT NOT NULL,
   prompt TEXT NOT NULL,
   thumbnail_url TEXT,
-  category TEXT NOT NULL CHECK (category IN ('newborn', 'toddler', 'family', 'seasonal', 'fantasy')),
+  category TEXT NOT NULL CHECK (category IN ('newborn', 'toddler', 'family', 'seasonal', 'fantasy', 'holiday', 'outdoor', 'formal', 'lifestyle', 'sports', 'vintage', 'adventure')),
+  session_type TEXT NOT NULL DEFAULT 'child' CHECK (session_type IN ('child', 'family', 'both')),
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -44,7 +45,7 @@ CREATE TABLE themes (
 CREATE TABLE photoshoot_sessions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  child_id UUID NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+  child_id UUID REFERENCES children(id) ON DELETE CASCADE, -- Made nullable for family sessions
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'training', 'ready', 'generating', 'completed', 'failed')),
   model_id TEXT,
   training_job_id TEXT,
@@ -54,8 +55,14 @@ CREATE TABLE photoshoot_sessions (
   selected_theme_id UUID REFERENCES themes(id),
   base_prompt TEXT,
   enhanced_prompt TEXT,
+  family_fingerprint TEXT, -- For family session model reuse
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  -- Constraint: either child_id OR family_fingerprint must be set
+  CONSTRAINT session_type_check CHECK (
+    (child_id IS NOT NULL AND family_fingerprint IS NULL) OR 
+    (child_id IS NULL AND family_fingerprint IS NOT NULL)
+  )
 );
 
 -- Generated images
@@ -88,23 +95,27 @@ CREATE TABLE subscriptions (
 );
 
 -- Insert default themes
-INSERT INTO themes (name, description, prompt, category, thumbnail_url) VALUES
-('Newborn in Bloom', 'Soft florals and pastels perfect for newborns', 'surrounded by delicate flowers, soft pastel colors, dreamy floral background, gentle spring vibes', 'newborn', '/themes/bloom.jpg'),
-('Superhero Adventure', 'Heroic poses and colorful capes', 'wearing a colorful superhero cape, heroic pose, bright colors, adventure theme, playful superhero setting', 'toddler', '/themes/superhero.jpg'),
-('Beach Day', 'Sandy shores and sunshine vibes', 'on a beautiful beach, sandy background, ocean waves, sunny day, tropical paradise, summer vibes', 'family', '/themes/beach.jpg'),
-('Holiday Magic', 'Festive and cozy winter wonderland', 'in a magical winter wonderland, snow, festive decorations, cozy holiday atmosphere, warm lighting', 'seasonal', '/themes/holiday.jpg'),
-('Garden Party', 'Whimsical garden setting with butterflies', 'in a magical garden, butterflies, colorful flowers, enchanted forest, fairy tale setting', 'toddler', '/themes/garden.jpg'),
-('Cozy Nursery', 'Soft and warm nursery environment', 'in a cozy nursery, soft blankets, warm lighting, peaceful atmosphere, comfort and love', 'newborn', '/themes/nursery.jpg'),
-('Safari Adventure', 'Wild safari with friendly animals', 'on a safari adventure, friendly animals, jungle setting, explorer theme, adventure and discovery', 'toddler', '/themes/safari.jpg'),
-('Starry Night', 'Dreamy nighttime with stars and moon', 'under a starry night sky, crescent moon, twinkling stars, dreamy atmosphere, magical night', 'family', '/themes/starry.jpg');
+INSERT INTO themes (name, description, prompt, category, session_type, thumbnail_url) VALUES
+('Newborn in Bloom', 'Soft florals and pastels perfect for newborns', 'surrounded by delicate flowers, soft pastel colors, dreamy floral background, gentle spring vibes', 'newborn', 'child', '/themes/bloom.jpg'),
+('Superhero Adventure', 'Heroic poses and colorful capes', 'wearing a colorful superhero cape, heroic pose, bright colors, adventure theme, playful superhero setting', 'fantasy', 'both', '/themes/superhero.jpg'),
+('Beach Day', 'Sandy shores and sunshine vibes', 'on a beautiful beach, sandy background, ocean waves, sunny day, tropical paradise, summer vibes', 'outdoor', 'both', '/themes/beach.jpg'),
+('Holiday Magic', 'Festive and cozy winter wonderland', 'in a magical winter wonderland, snow, festive decorations, cozy holiday atmosphere, warm lighting', 'holiday', 'both', '/themes/holiday.jpg'),
+('Garden Party', 'Whimsical garden setting with butterflies', 'in a magical garden, butterflies, colorful flowers, enchanted forest, fairy tale setting', 'outdoor', 'both', '/themes/garden.jpg'),
+('Cozy Nursery', 'Soft and warm nursery environment', 'in a cozy nursery, soft blankets, warm lighting, peaceful atmosphere, comfort and love', 'newborn', 'child', '/themes/nursery.jpg'),
+('Safari Adventure', 'Wild safari with friendly animals', 'on a safari adventure, friendly animals, jungle setting, explorer theme, adventure and discovery', 'adventure', 'both', '/themes/safari.jpg'),
+('Starry Night', 'Dreamy nighttime with stars and moon', 'under a starry night sky, crescent moon, twinkling stars, dreamy atmosphere, magical night', 'fantasy', 'both', '/themes/starry.jpg');
 
 -- Create indexes for better performance
 CREATE INDEX idx_children_user_id ON children(user_id);
 CREATE INDEX idx_sessions_user_id ON photoshoot_sessions(user_id);
 CREATE INDEX idx_sessions_child_id ON photoshoot_sessions(child_id);
 CREATE INDEX idx_sessions_status ON photoshoot_sessions(status);
+CREATE INDEX idx_sessions_family_fingerprint ON photoshoot_sessions(family_fingerprint);
+CREATE INDEX idx_sessions_user_family_fingerprint ON photoshoot_sessions(user_id, family_fingerprint);
 CREATE INDEX idx_images_session_id ON generated_images(session_id);
 CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);
+CREATE INDEX idx_themes_session_type ON themes(session_type);
+CREATE INDEX idx_themes_active_session_type ON themes(is_active, session_type);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()

@@ -7,7 +7,7 @@ import { XMarkIcon, CheckIcon, SparklesIcon } from '@heroicons/react/24/outline'
 import { loadStripe } from '@stripe/stripe-js'
 import toast from 'react-hot-toast'
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '')
 
 interface PricingModalProps {
   isOpen: boolean

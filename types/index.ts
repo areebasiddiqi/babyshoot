@@ -11,16 +11,25 @@ export interface User {
 export interface Child {
   id: string
   userId: string
+  user_id?: string
   name: string
-  ageInMonths: number
+  ageInMonths?: number
+  age_in_months?: number
   gender: 'boy' | 'girl' | 'other'
-  hairColor: string
-  hairStyle: string
-  eyeColor: string
-  skinTone: string
+  hairColor?: string
+  hair_color?: string
+  hairStyle?: string
+  hair_style?: string
+  eyeColor?: string
+  eye_color?: string
+  skinTone?: string
+  skin_tone?: string
   uniqueFeatures?: string
-  createdAt: Date
-  updatedAt: Date
+  unique_features?: string
+  createdAt?: Date
+  created_at?: Date
+  updatedAt?: Date
+  updated_at?: Date
 }
 
 export interface PhotoshootSession {
@@ -99,7 +108,8 @@ export interface FormData {
 }
 
 export interface UploadedFile {
-  file: File
+  file: File | null
   preview: string
   id: string
+  isExisting?: boolean
 }

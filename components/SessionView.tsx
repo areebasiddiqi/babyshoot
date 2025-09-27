@@ -256,15 +256,26 @@ export default function SessionView({ session: initialSession }: SessionViewProp
           {/* Session Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-1">Child</h3>
-              <p className="text-lg font-semibold text-gray-900">{session.children?.name || 'Unknown'}</p>
-              <p className="text-sm text-gray-600">
-                {session.children?.age_in_months ? (
-                  session.children.age_in_months < 12 
-                    ? `${session.children.age_in_months} months old`
-                    : `${Math.floor(session.children.age_in_months / 12)} years old`
-                ) : 'Age not specified'}
-              </p>
+              <h3 className="text-sm font-medium text-gray-500 mb-1">
+                {session.child_id ? 'Child' : 'Session Type'}
+              </h3>
+              {session.child_id ? (
+                <>
+                  <p className="text-lg font-semibold text-gray-900">{session.children?.name || 'Unknown'}</p>
+                  <p className="text-sm text-gray-600">
+                    {session.children?.age_in_months ? (
+                      session.children.age_in_months < 12 
+                        ? `${session.children.age_in_months} months old`
+                        : `${Math.floor(session.children.age_in_months / 12)} years old`
+                    ) : 'Age not specified'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-semibold text-gray-900">Family Photoshoot</p>
+                  <p className="text-sm text-gray-600">Multiple family members</p>
+                </>
+              )}
             </div>
             
             <div>

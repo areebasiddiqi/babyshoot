@@ -19,10 +19,11 @@ import { FormData as ChildFormData, UploadedFile, Theme, Child } from '@/types'
 import { validateImageFile, generateBasePrompt } from '@/lib/utils'
 
 const steps = [
-  { id: 1, name: 'Child Profile', description: 'Tell us about your little one' },
-  { id: 2, name: 'Upload Photos', description: 'Share 5-10 clear photos' },
-  { id: 3, name: 'Choose Theme', description: 'Pick a magical theme' },
-  { id: 4, name: 'Review & Create', description: 'Start the magic!' }
+  { id: 1, name: 'Session Type', description: 'Choose photoshoot type' },
+  { id: 2, name: 'Profile Setup', description: 'Add participant details' },
+  { id: 3, name: 'Upload Photos', description: 'Share 5-10 clear photos' },
+  { id: 4, name: 'Choose Theme', description: 'Pick a magical theme' },
+  { id: 5, name: 'Review & Create', description: 'Start the magic!' }
 ]
 
 // Themes will be loaded from API
@@ -32,8 +33,10 @@ function CreatePhotoshootContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const childId = searchParams.get('child')
+  const reuseSessionId = searchParams.get('reuseSession')
 
   const [currentStep, setCurrentStep] = useState(1)
+  const [sessionType, setSessionType] = useState<'child' | 'family' | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -41,6 +44,11 @@ function CreatePhotoshootContent() {
   const [selectedChild, setSelectedChild] = useState<Child | null>(null)
   const [themes, setThemes] = useState<Theme[]>([])
   const [isLoadingThemes, setIsLoadingThemes] = useState(false)
+  
+  // Family session states
+  const [familyMembers, setFamilyMembers] = useState([
+    { id: 1, name: '', age: '', relation: 'parent', gender: 'male' }
+  ])
 
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<ChildFormData>()
 
@@ -52,24 +60,122 @@ function CreatePhotoshootContent() {
     }
   }, [user])
 
+  // Fetch themes when session type changes
+  useEffect(() => {
+    if (sessionType) {
+      fetchThemes(sessionType)
+      // Reset selected theme when session type changes
+      setSelectedTheme(null)
+    }
+  }, [sessionType])
+
   // Pre-select child if coming from dashboard
   useEffect(() => {
     if (childId && existingChildren.length > 0) {
       const child = existingChildren.find(c => c.id === childId)
       if (child) {
         setSelectedChild(child)
+        setSessionType('child')
         // Pre-fill form with child data
         setValue('childName', child.name)
-        setValue('ageInMonths', child.ageInMonths)
+        setValue('ageInMonths', child.age_in_months || child.ageInMonths || 0)
         setValue('gender', child.gender)
-        setValue('hairColor', child.hairColor)
-        setValue('hairStyle', child.hairStyle)
-        setValue('eyeColor', child.eyeColor)
-        setValue('skinTone', child.skinTone)
-        setValue('uniqueFeatures', child.uniqueFeatures || '')
+        setValue('hairColor', child.hair_color || child.hairColor || '')
+        setValue('hairStyle', child.hair_style || child.hairStyle || '')
+        setValue('eyeColor', child.eye_color || child.eyeColor || '')
+        setValue('skinTone', child.skin_tone || child.skinTone || '')
+        setValue('uniqueFeatures', child.unique_features || child.uniqueFeatures || '')
+        
+        // Fetch the most recent completed session for this child to get photos
+        fetchChildSessionPhotos(childId)
+        
+        // Skip to theme selection since we have the model
+        setCurrentStep(4)
+        
+        toast.success(`${child.name}'s profile loaded! Choose a new theme to create more photos.`)
       }
     }
   }, [childId, existingChildren, setValue])
+
+  const fetchChildSessionPhotos = async (childId: string) => {
+    try {
+      const response = await fetch(`/api/children/${childId}/latest-session`)
+      if (response.ok) {
+        const sessionData = await response.json()
+        
+        // Set uploaded photos from the latest session
+        if (sessionData.uploaded_photos && sessionData.uploaded_photos.length > 0) {
+          const existingPhotos = sessionData.uploaded_photos.map((url: string, index: number) => ({
+            id: `existing-${index}`,
+            file: null,
+            preview: url,
+            isExisting: true
+          }))
+          setUploadedFiles(existingPhotos)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch child session photos:', error)
+      // Don't show error to user, just proceed without photos
+    }
+  }
+
+  // Handle reuse session parameter
+  useEffect(() => {
+    if (reuseSessionId) {
+      fetchReuseSessionData(reuseSessionId)
+    }
+  }, [reuseSessionId])
+
+  const fetchReuseSessionData = async (sessionId: string) => {
+    try {
+      const response = await fetch(`/api/photoshoot/${sessionId}`)
+      if (response.ok) {
+        const sessionData = await response.json()
+        
+        if (sessionData.child_id) {
+          // Child session reuse
+          setSessionType('child')
+          const child = existingChildren.find(c => c.id === sessionData.child_id)
+          if (child) {
+            setSelectedChild(child)
+            setValue('childName', child.name)
+            setValue('ageInMonths', child.age_in_months || child.ageInMonths || 0)
+            setValue('gender', child.gender)
+            setValue('hairColor', child.hair_color || child.hairColor || '')
+            setValue('hairStyle', child.hair_style || child.hairStyle || '')
+            setValue('eyeColor', child.eye_color || child.eyeColor || '')
+            setValue('skinTone', child.skin_tone || child.skinTone || '')
+            setValue('uniqueFeatures', child.unique_features || child.uniqueFeatures || '')
+          }
+        } else if (sessionData.family_fingerprint) {
+          // Family session reuse - we'll need to parse the fingerprint back to family members
+          setSessionType('family')
+          // For now, just set the session type and let user re-enter family members
+          // In a future enhancement, we could store family member data separately
+        }
+        
+        // Set uploaded photos from the session
+        if (sessionData.uploaded_photos && sessionData.uploaded_photos.length > 0) {
+          const existingPhotos = sessionData.uploaded_photos.map((url: string, index: number) => ({
+            id: `existing-${index}`,
+            file: null, // We don't have the original file
+            preview: url,
+            isExisting: true
+          }))
+          setUploadedFiles(existingPhotos)
+        }
+        
+        // Skip to theme selection since we have the model and photos
+        setCurrentStep(4)
+        
+        toast.success('Session data loaded! Choose a new theme to create more photos.')
+      }
+    } catch (error) {
+      console.error('Failed to fetch reuse session data:', error)
+      toast.error('Failed to load session data')
+    }
+  }
 
   const fetchExistingChildren = async () => {
     try {
@@ -83,10 +189,10 @@ function CreatePhotoshootContent() {
     }
   }
 
-  const fetchThemes = async () => {
+  const fetchThemes = async (sessionType: 'child' | 'family' = 'child') => {
     try {
       setIsLoadingThemes(true)
-      const response = await fetch('/api/themes')
+      const response = await fetch(`/api/themes?sessionType=${sessionType}`)
       if (response.ok) {
         const themesData = await response.json()
         setThemes(themesData)
@@ -97,7 +203,6 @@ function CreatePhotoshootContent() {
       setIsLoadingThemes(false)
     }
   }
-
   const onDrop = (acceptedFiles: File[]) => {
     const newFiles: UploadedFile[] = acceptedFiles.map(file => {
       const validation = validateImageFile(file)
@@ -148,7 +253,7 @@ function CreatePhotoshootContent() {
   }
 
   const onSubmit = async (data: ChildFormData) => {
-    if (currentStep < 4) return
+    if (currentStep < 5) return
 
     if (uploadedFiles.length < 3) {
       toast.error('Please upload at least 3 photos')
@@ -163,18 +268,77 @@ function CreatePhotoshootContent() {
     setIsSubmitting(true)
 
     try {
+      console.log('Form submission data:', { 
+        sessionType, 
+        selectedChild, 
+        childId, 
+        reuseSessionId, 
+        uploadedFiles: uploadedFiles.length,
+        selectedTheme: selectedTheme?.name 
+      })
+      
+      // Debug child data structure
+      if (selectedChild) {
+        console.log('Selected child properties:', Object.keys(selectedChild))
+        console.log('Age properties:', {
+          ageInMonths: selectedChild.ageInMonths,
+          age_in_months: selectedChild.age_in_months
+        })
+      }
+      
       // Create FormData for file upload
       const formData = new FormData()
       
-      // Add child data
-      Object.entries(data).forEach(([key, value]) => {
-        formData.append(key, value.toString())
+      // Add session type
+      formData.append('sessionType', sessionType!)
+      
+      // Add session-specific data
+      if (sessionType === 'child') {
+        // If we have a selected child (reuse scenario), use that data
+        if (selectedChild) {
+          formData.append('childName', selectedChild.name)
+          formData.append('ageInMonths', (selectedChild.age_in_months || selectedChild.ageInMonths || 0).toString())
+          formData.append('gender', selectedChild.gender)
+          formData.append('hairColor', selectedChild.hair_color || selectedChild.hairColor || '')
+          formData.append('hairStyle', selectedChild.hair_style || selectedChild.hairStyle || '')
+          formData.append('eyeColor', selectedChild.eye_color || selectedChild.eyeColor || '')
+          formData.append('skinTone', selectedChild.skin_tone || selectedChild.skinTone || '')
+          if (selectedChild.unique_features || selectedChild.uniqueFeatures) {
+            formData.append('uniqueFeatures', selectedChild.unique_features || selectedChild.uniqueFeatures || '')
+          }
+        } else {
+          // Use form data for new child
+          Object.entries(data).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+              formData.append(key, value.toString())
+            }
+          })
+        }
+      } else if (sessionType === 'family') {
+        formData.append('familyMembers', JSON.stringify(familyMembers))
+      }
+      
+      // Add files (only new files, not existing ones)
+      const newFiles = uploadedFiles.filter(f => !f.isExisting && f.file)
+      newFiles.forEach((file, index) => {
+        formData.append(`photo_${index}`, file.file!)
       })
       
-      // Add files
-      uploadedFiles.forEach((file, index) => {
-        formData.append(`photo_${index}`, file.file)
-      })
+      // Add existing photo URLs for reuse
+      const existingPhotos = uploadedFiles.filter(f => f.isExisting).map(f => f.preview)
+      if (existingPhotos.length > 0) {
+        formData.append('existingPhotos', JSON.stringify(existingPhotos))
+      }
+      
+      // Add reuse session ID if applicable
+      if (reuseSessionId) {
+        formData.append('reuseSessionId', reuseSessionId)
+      }
+      
+      // Add child ID for child reuse (when using ?child= parameter)
+      if (childId && sessionType === 'child') {
+        formData.append('reuseChildId', childId)
+      }
       
       // Add theme
       formData.append('themeId', selectedTheme.id)
@@ -187,7 +351,19 @@ function CreatePhotoshootContent() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to create photoshoot')
+        const errorData = await response.json()
+        
+        // Handle insufficient credits error
+        if (response.status === 402) {
+          toast.error(errorData.message || 'Insufficient credits')
+          // Redirect to billing page to purchase credits
+          setTimeout(() => {
+            router.push('/billing')
+          }, 2000)
+          return
+        }
+        
+        throw new Error(errorData.error || 'Failed to create photoshoot')
       }
 
       const result = await response.json()
@@ -209,7 +385,7 @@ function CreatePhotoshootContent() {
   }
 
   const nextStep = () => {
-    if (currentStep < 4) {
+    if (currentStep < 5) {
       setCurrentStep(currentStep + 1)
     }
   }
@@ -223,12 +399,19 @@ function CreatePhotoshootContent() {
   const canProceed = () => {
     switch (currentStep) {
       case 1:
-        const formData = watch()
-        return formData.childName && formData.ageInMonths && formData.gender && 
-               formData.hairColor && formData.eyeColor && formData.skinTone
+        return sessionType !== null
       case 2:
-        return uploadedFiles.length >= 3
+        if (sessionType === 'child') {
+          const formData = watch()
+          return formData.childName && formData.ageInMonths && formData.gender && 
+                 formData.hairColor && formData.eyeColor && formData.skinTone
+        } else if (sessionType === 'family') {
+          return familyMembers.every(member => member.name && member.relation && member.gender)
+        }
+        return false
       case 3:
+        return uploadedFiles.length >= 3
+      case 4:
         return selectedTheme !== null
       default:
         return true
@@ -286,8 +469,72 @@ function CreatePhotoshootContent() {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)}>
-          {/* Step 1: Child Profile */}
+          {/* Step 1: Session Type Selection */}
           {currentStep === 1 && (
+            <div className="card">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Choose Your Photoshoot Type</h2>
+              <p className="text-gray-600 mb-8">Select the type of photoshoot you'd like to create</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Child Photoshoot Option */}
+                <button
+                  type="button"
+                  onClick={() => setSessionType('child')}
+                  className={`p-6 border-2 rounded-xl transition-all text-left ${
+                    sessionType === 'child'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50'
+                  }`}
+                >
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-purple-500 rounded-xl flex items-center justify-center">
+                      <SparklesIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="ml-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Child Photoshoot</h3>
+                      <p className="text-sm text-gray-600">Perfect for individual children</p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Focus on one child</li>
+                    <li>• Personalized AI model</li>
+                    <li>• Age-appropriate themes</li>
+                    <li>• Model reuse for 30 days</li>
+                  </ul>
+                </button>
+
+                {/* Family Photoshoot Option */}
+                <button
+                  type="button"
+                  onClick={() => setSessionType('family')}
+                  className={`p-6 border-2 rounded-xl transition-all text-left ${
+                    sessionType === 'family'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50'
+                  }`}
+                >
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center">
+                      <PhotoIcon className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="ml-4">
+                      <h3 className="text-lg font-semibold text-gray-900">Family Photoshoot</h3>
+                      <p className="text-sm text-gray-600">Include multiple family members</p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• Multiple family members</li>
+                    <li>• Group compositions</li>
+                    <li>• Family-themed scenarios</li>
+                    <li>• Model reuse for same family</li>
+                  </ul>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Profile Setup */}
+          {currentStep === 2 && sessionType === 'child' && (
             <div className="card">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Tell us about your little one</h2>
               
@@ -464,12 +711,142 @@ function CreatePhotoshootContent() {
             </div>
           )}
 
-          {/* Step 2: Upload Photos */}
-          {currentStep === 2 && (
+          {/* Step 2: Family Member Setup */}
+          {currentStep === 2 && sessionType === 'family' && (
+            <div className="card">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Add Family Members</h2>
+              <p className="text-gray-600 mb-6">
+                Tell us about each family member who will be in the photoshoot.
+              </p>
+
+              {familyMembers.map((member, index) => (
+                <div key={member.id} className="mb-6 p-4 border border-gray-200 rounded-lg">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Family Member {index + 1}
+                    </h3>
+                    {familyMembers.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setFamilyMembers(familyMembers.filter(m => m.id !== member.id))}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <XMarkIcon className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={member.name}
+                        onChange={(e) => {
+                          const updated = familyMembers.map(m => 
+                            m.id === member.id ? { ...m, name: e.target.value } : m
+                          )
+                          setFamilyMembers(updated)
+                        }}
+                        className="input-field"
+                        placeholder="Enter name"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Age
+                      </label>
+                      <input
+                        type="text"
+                        value={member.age}
+                        onChange={(e) => {
+                          const updated = familyMembers.map(m => 
+                            m.id === member.id ? { ...m, age: e.target.value } : m
+                          )
+                          setFamilyMembers(updated)
+                        }}
+                        className="input-field"
+                        placeholder="e.g., 35, 8 years, 6 months"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Relation *
+                      </label>
+                      <select
+                        value={member.relation}
+                        onChange={(e) => {
+                          const updated = familyMembers.map(m => 
+                            m.id === member.id ? { ...m, relation: e.target.value } : m
+                          )
+                          setFamilyMembers(updated)
+                        }}
+                        className="input-field"
+                        required
+                      >
+                        <option value="parent">Parent</option>
+                        <option value="child">Child</option>
+                        <option value="grandparent">Grandparent</option>
+                        <option value="sibling">Sibling</option>
+                        <option value="spouse">Spouse</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Gender *
+                      </label>
+                      <select
+                        value={member.gender}
+                        onChange={(e) => {
+                          const updated = familyMembers.map(m => 
+                            m.id === member.id ? { ...m, gender: e.target.value } : m
+                          )
+                          setFamilyMembers(updated)
+                        }}
+                        className="input-field"
+                        required
+                      >
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const newId = Math.max(...familyMembers.map(m => m.id)) + 1
+                  setFamilyMembers([...familyMembers, {
+                    id: newId,
+                    name: '',
+                    age: '',
+                    relation: 'child',
+                    gender: 'male'
+                  }])
+                }}
+                className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-primary-300 hover:text-primary-600 transition-colors"
+              >
+                + Add Another Family Member
+              </button>
+            </div>
+          )}
+
+          {/* Step 3: Upload Photos */}
+          {currentStep === 3 && (
             <div className="card">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Upload Photos</h2>
               <p className="text-gray-600 mb-6">
-                Upload 5-10 clear photos of your child from different angles. This helps our AI create better results.
+                Upload 5-10 clear photos {sessionType === 'child' ? 'of your child' : 'of your family members'} from different angles. This helps our AI create better results.
               </p>
 
               <div
@@ -494,7 +871,12 @@ function CreatePhotoshootContent() {
               {uploadedFiles.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
-                    Uploaded Photos ({uploadedFiles.length}/10)
+                    Photos ({uploadedFiles.length}/10)
+                    {uploadedFiles.some(f => f.isExisting) && (
+                      <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                        Reusing existing photos
+                      </span>
+                    )}
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {uploadedFiles.map((file) => (
@@ -502,8 +884,17 @@ function CreatePhotoshootContent() {
                         <img
                           src={file.preview}
                           alt="Upload preview"
-                          className="w-full aspect-square object-cover rounded-lg"
+                          className={`w-full aspect-square object-cover rounded-lg ${
+                            file.isExisting 
+                              ? 'border-2 border-green-300 bg-green-50' 
+                              : ''
+                          }`}
                         />
+                        {file.isExisting && (
+                          <div className="absolute top-1 left-1 bg-green-500 text-white text-xs px-1 py-0.5 rounded">
+                            Existing
+                          </div>
+                        )}
                         <button
                           type="button"
                           onClick={() => removeFile(file.id)}
@@ -527,12 +918,15 @@ function CreatePhotoshootContent() {
             </div>
           )}
 
-          {/* Step 3: Choose Theme */}
-          {currentStep === 3 && (
+          {/* Step 4: Choose Theme */}
+          {currentStep === 4 && (
             <div className="card">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Choose a Theme</h2>
               <p className="text-gray-600 mb-6">
-                Select a magical theme for your photoshoot. Each theme is carefully designed to be safe and beautiful for children.
+                {sessionType === 'child' 
+                  ? 'Select a magical theme for your photoshoot. Each theme is carefully designed to be safe and beautiful for children.'
+                  : 'Select a theme for your family photoshoot. Each theme is designed to create beautiful memories for the whole family.'
+                }
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -578,24 +972,49 @@ function CreatePhotoshootContent() {
             </div>
           )}
 
-          {/* Step 4: Review & Create */}
-          {currentStep === 4 && (
+          {/* Step 5: Review & Create */}
+          {currentStep === 5 && (
             <div className="card">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Review & Create</h2>
               
               <div className="space-y-6">
-                {/* Child Info */}
+                {/* Session Type */}
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Child Information</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Session Type</h3>
                   <div className="bg-gray-50 rounded-lg p-4">
-                    <p><strong>Name:</strong> {watch('childName')}</p>
-                    <p><strong>Age:</strong> {watch('ageInMonths')} months</p>
-                    <p><strong>Gender:</strong> {watch('gender')}</p>
-                    <p><strong>Hair:</strong> {watch('hairStyle')} {watch('hairColor')}</p>
-                    <p><strong>Eyes:</strong> {watch('eyeColor')}</p>
-                    <p><strong>Skin tone:</strong> {watch('skinTone')}</p>
-                    {watch('uniqueFeatures') && (
-                      <p><strong>Features:</strong> {watch('uniqueFeatures')}</p>
+                    <p className="capitalize font-medium">{sessionType} Photoshoot</p>
+                  </div>
+                </div>
+
+                {/* Participants Info */}
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">
+                    {sessionType === 'child' ? 'Child Information' : 'Family Members'}
+                  </h3>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+                    {sessionType === 'child' ? (
+                      <div>
+                        <p><strong>Name:</strong> {watch('childName')}</p>
+                        <p><strong>Age:</strong> {watch('ageInMonths')} months</p>
+                        <p><strong>Gender:</strong> {watch('gender')}</p>
+                        <p><strong>Hair:</strong> {watch('hairStyle')} {watch('hairColor')}</p>
+                        <p><strong>Eyes:</strong> {watch('eyeColor')}</p>
+                        <p><strong>Skin tone:</strong> {watch('skinTone')}</p>
+                        {watch('uniqueFeatures') && (
+                          <p><strong>Features:</strong> {watch('uniqueFeatures')}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {familyMembers.map((member, index) => (
+                          <div key={member.id} className="border-l-4 border-primary-500 pl-4">
+                            <p><strong>{member.name}</strong> - {member.relation}</p>
+                            <p className="text-sm text-gray-600">
+                              {member.age && `${member.age}, `}{member.gender}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -677,7 +1096,7 @@ function CreatePhotoshootContent() {
               <span>Previous</span>
             </button>
 
-            {currentStep < 4 ? (
+            {currentStep < 5 ? (
               <button
                 type="button"
                 onClick={nextStep}

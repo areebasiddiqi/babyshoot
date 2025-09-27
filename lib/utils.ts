@@ -175,3 +175,56 @@ export function getDaysUntilExpiration(updatedAt: string, daysValid: number = 30
   const diffTime = expirationDate.getTime() - now.getTime()
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 }
+
+// Generate family prompt for AI training
+export function generateFamilyPrompt(familyMembers: any[]): string {
+  const memberDescriptions = familyMembers.map(member => {
+    let desc = `${member.name} (${member.relation}, ${member.gender}`
+    if (member.age) {
+      desc += `, ${member.age}`
+    }
+    desc += ')'
+    return desc
+  }).join(', ')
+
+  return `Family portrait featuring ${memberDescriptions}. Professional family photography style, warm and natural lighting, genuine expressions and interactions between family members.`
+}
+
+// Generate family fingerprint for model reuse matching
+export function generateFamilyFingerprint(familyMembers: any[]): string {
+  // Sort family members by relation and gender for consistent fingerprinting
+  const sortedMembers = [...familyMembers].sort((a, b) => {
+    if (a.relation !== b.relation) {
+      return a.relation.localeCompare(b.relation)
+    }
+    return a.gender.localeCompare(b.gender)
+  })
+
+  // Create fingerprint based on family composition (excluding names for privacy)
+  const fingerprint = sortedMembers.map(member => {
+    let fp = `${member.relation}_${member.gender}`
+    // Include age range instead of exact age for better matching
+    if (member.age) {
+      const ageNum = parseInt(member.age.toString())
+      if (!isNaN(ageNum)) {
+        if (ageNum < 5) fp += '_toddler'
+        else if (ageNum < 13) fp += '_child'
+        else if (ageNum < 20) fp += '_teen'
+        else if (ageNum < 65) fp += '_adult'
+        else fp += '_senior'
+      }
+    }
+    return fp
+  }).join('|')
+
+  return fingerprint
+}
+
+// Check if two family compositions are similar enough for model reuse
+export function areFamilyCompositionsSimilar(members1: any[], members2: any[]): boolean {
+  const fp1 = generateFamilyFingerprint(members1)
+  const fp2 = generateFamilyFingerprint(members2)
+  
+  // Exact match for now - could be made more flexible in the future
+  return fp1 === fp2
+}
