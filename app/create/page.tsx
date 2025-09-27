@@ -243,13 +243,13 @@ function CreatePhotoshootContent() {
   const selectExistingChild = (child: Child) => {
     setSelectedChild(child)
     setValue('childName', child.name)
-    setValue('ageInMonths', child.ageInMonths)
+    setValue('ageInMonths', child.ageInMonths || child.age_in_months || 0)
     setValue('gender', child.gender)
-    setValue('hairColor', child.hairColor)
-    setValue('hairStyle', child.hairStyle)
-    setValue('eyeColor', child.eyeColor)
-    setValue('skinTone', child.skinTone)
-    setValue('uniqueFeatures', child.uniqueFeatures || '')
+    setValue('hairColor', child.hairColor || child.hair_color || '')
+    setValue('hairStyle', child.hairStyle || child.hair_style || '')
+    setValue('eyeColor', child.eyeColor || child.eye_color || '')
+    setValue('skinTone', child.skinTone || child.skin_tone || '')
+    setValue('uniqueFeatures', child.uniqueFeatures || child.unique_features || '')
   }
 
   const onSubmit = async (data: ChildFormData) => {
