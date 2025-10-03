@@ -190,57 +190,112 @@ export default function DashboardContent({
     <CreditProvider initialBalance={creditBalance}>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center space-x-4">
-                <Link href="/" className="flex items-center space-x-2">
-                  <SparklesIcon className="h-8 w-8 text-primary-500" />
+            <div className="flex justify-between items-center h-20">
+              {/* Left side - Logo and page title */}
+              <div className="flex items-center space-x-6">
+                <Link href="/" className="flex items-center space-x-3 group">
+                  <SparklesIcon className="h-8 w-8 text-primary-500 group-hover:text-primary-600 transition-colors" />
                   <span className="text-xl font-bold gradient-text">BabyShoot AI</span>
                 </Link>
-                <div className="hidden sm:block text-gray-300">|</div>
-                <h1 className="hidden sm:block text-xl font-semibold text-gray-900">Dashboard</h1>
+                <div className="hidden md:block h-6 w-px bg-gray-300"></div>
+                <h1 className="hidden md:block text-lg font-medium text-gray-700">Dashboard</h1>
               </div>
               
-              <div className="flex items-center space-x-4">
-                {isRefreshing && (
-                  <div className="flex items-center text-sm text-gray-500">
-                    <ClockIcon className="h-4 w-4 animate-spin mr-1" />
-                    Refreshing...
-                  </div>
-                )}
-                <DashboardCreditDisplay />
-                <Link href="/gallery" className="btn-secondary">
-                  <RectangleStackIcon className="h-5 w-5 mr-2" />
-                  Gallery
-                </Link>
-                <Link href="/albums" className="btn-secondary">
-                  <BookOpenIcon className="h-5 w-5 mr-2" />
-                  Albums
-                </Link>
-                {hasAdminAccess && (
-                  <Link href="/admin" className="btn-secondary">
-                    <CogIcon className="h-5 w-5 mr-2" />
-                    Admin
+              {/* Right side - Navigation and actions */}
+              <div className="flex items-center space-x-2 lg:space-x-4">
+                {/* Credits display */}
+                <div className="hidden sm:block">
+                  <DashboardCreditDisplay />
+                </div>
+                
+                {/* Navigation links - hidden on small screens */}
+                <div className="hidden lg:flex items-center space-x-2">
+                  <Link 
+                    href="/gallery" 
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                  >
+                    <RectangleStackIcon className="h-4 w-4 mr-2" />
+                    Gallery
                   </Link>
-                )}
-                <Link href={dashboardData.creditBalance > 0 ? "/create" : "/billing"} className="btn-primary">
+                  <Link 
+                    href="/albums" 
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                  >
+                    <BookOpenIcon className="h-4 w-4 mr-2" />
+                    Albums
+                  </Link>
+                  {hasAdminAccess && (
+                    <Link 
+                      href="/admin" 
+                      className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+                    >
+                      <CogIcon className="h-4 w-4 mr-2" />
+                      Admin
+                    </Link>
+                  )}
+                </div>
+                
+                {/* Primary action button */}
+                <Link 
+                  href={dashboardData.creditBalance > 0 ? "/create" : "/billing"} 
+                  className="inline-flex items-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                >
                   {dashboardData.creditBalance > 0 ? (
                     <>
-                      <PlusIcon className="h-5 w-5 mr-2" />
-                      New Photoshoot
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      <span className="hidden sm:inline">New Photoshoot</span>
+                      <span className="sm:hidden">Create</span>
                     </>
                   ) : (
                     <>
-                      <BanknotesIcon className="h-5 w-5 mr-2" />
-                      Buy Credits
+                      <BanknotesIcon className="h-4 w-4 mr-2" />
+                      <span className="hidden sm:inline">Buy Credits</span>
+                      <span className="sm:hidden">Credits</span>
                     </>
                   )}
                 </Link>
+                
+                {/* User menu */}
                 <UserMenu 
                   userEmail={user.email || undefined}
                   userName={user.user_metadata?.first_name || user.user_metadata?.name || undefined}
                 />
+              </div>
+            </div>
+          </div>
+          
+          {/* Mobile navigation - shown on small screens */}
+          <div className="lg:hidden border-t border-gray-200 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+              <div className="flex items-center justify-center space-x-8 py-3">
+                <Link 
+                  href="/gallery" 
+                  className="flex flex-col items-center text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <RectangleStackIcon className="h-5 w-5 mb-1" />
+                  Gallery
+                </Link>
+                <Link 
+                  href="/albums" 
+                  className="flex flex-col items-center text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                >
+                  <BookOpenIcon className="h-5 w-5 mb-1" />
+                  Albums
+                </Link>
+                {hasAdminAccess && (
+                  <Link 
+                    href="/admin" 
+                    className="flex flex-col items-center text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <CogIcon className="h-5 w-5 mb-1" />
+                    Admin
+                  </Link>
+                )}
+                <div className="sm:hidden">
+                  <DashboardCreditDisplay />
+                </div>
               </div>
             </div>
           </div>

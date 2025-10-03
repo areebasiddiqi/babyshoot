@@ -90,11 +90,10 @@ function CreatePhotoshootContent() {
 
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<ChildFormData>()
 
-  // Load existing children and themes on mount
+  // Load existing children on mount
   useEffect(() => {
     if (user) {
       fetchExistingChildren()
-      fetchThemes()
     }
   }, [user])
 
@@ -113,6 +112,8 @@ function CreatePhotoshootContent() {
     if (sessionType) {
       // Reset selected theme when session type changes
       setSelectedTheme(null)
+      // Fetch themes for the new session type
+      fetchThemes(sessionType)
     }
   }, [sessionType])
 
