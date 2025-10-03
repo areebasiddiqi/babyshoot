@@ -7,7 +7,8 @@ import {
   TrashIcon,
   EyeIcon,
   EyeSlashIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  PhotoIcon
 } from '@heroicons/react/24/outline'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isAdmin } from '@/lib/admin-utils'
@@ -47,14 +48,14 @@ export default async function ThemeManagement() {
   const { data: { session } } = await supabase.auth.getSession()
   
   if (!session) {
-    redirect('/sign-in')
+    return redirect('/sign-in')
   }
 
   const user = session.user
   const hasAdminAccess = await isAdmin(user.id)
   
   if (!hasAdminAccess) {
-    redirect('/dashboard')
+    return redirect('/dashboard')
   }
 
   const themes = await getThemes()
@@ -196,6 +197,13 @@ export default async function ThemeManagement() {
                           title="Edit Theme"
                         >
                           <PencilIcon className="h-4 w-4" />
+                        </Link>
+                        <Link 
+                          href={`/admin/themes/${theme.id}/preview-images`}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Manage Preview Images"
+                        >
+                          <PhotoIcon className="h-4 w-4" />
                         </Link>
                         <ThemePromptsManagerWrapper 
                           theme={{

@@ -54,6 +54,15 @@ export interface Theme {
   thumbnailUrl: string
   category: 'newborn' | 'toddler' | 'family' | 'seasonal' | 'fantasy'
   isActive: boolean
+  previewImages?: string[] // Array of preview image URLs
+  prompts?: ThemePrompt[] // Associated prompts from theme_prompts table
+}
+
+export interface ThemePrompt {
+  id: string
+  prompt_text: string
+  prompt_order: number
+  is_active: boolean
 }
 
 export interface GeneratedImage {

@@ -16,6 +16,9 @@ import {
   GiftIcon
 } from '@heroicons/react/24/outline'
 import { useAuth } from '@/components/AuthProvider'
+import { useState, useEffect } from 'react'
+import { Theme } from '@/types'
+import ThemePreviewModal from '@/components/ThemePreviewModal'
 
 const features = [
   {
@@ -100,6 +103,30 @@ const testimonials = [
 
 export default function HomePage() {
   const { user } = useAuth()
+  const [themes, setThemes] = useState<Theme[]>([])
+  const [previewTheme, setPreviewTheme] = useState<Theme | null>(null)
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
+
+  // Load themes for preview
+  useEffect(() => {
+    const fetchThemes = async () => {
+      try {
+        const response = await fetch('/api/themes?sessionType=child')
+        if (response.ok) {
+          const themesData = await response.json()
+          setThemes(themesData.slice(0, 6)) // Show first 6 themes
+        }
+      } catch (error) {
+        console.error('Failed to fetch themes:', error)
+      }
+    }
+    fetchThemes()
+  }, [])
+
+  const handlePreviewTheme = (theme: Theme) => {
+    setPreviewTheme(theme)
+    setIsPreviewModalOpen(true)
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -114,6 +141,7 @@ export default function HomePage() {
             
             <div className="hidden md:flex items-center space-x-8">
               <a href="#features" className="text-gray-600 hover:text-gray-900 font-medium">Features</a>
+              <a href="#themes" className="text-gray-600 hover:text-gray-900 font-medium">Themes</a>
               <a href="#how-it-works" className="text-gray-600 hover:text-gray-900 font-medium">How it Works</a>
               <a href="#pricing" className="text-gray-600 hover:text-gray-900 font-medium">Pricing</a>
             </div>
@@ -306,6 +334,81 @@ export default function HomePage() {
                 <span>📸 Professional Enhancement</span>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Themes Showcase */}
+      <section id="themes" className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-6">
+              Magical Themes
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Choose from our collection of carefully crafted themes designed to create beautiful, 
+              safe, and age-appropriate portraits for your little ones.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {themes.map((theme) => (
+              <div
+                key={theme.id}
+                className="group bg-white rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+                onClick={() => handlePreviewTheme(theme)}
+              >
+                <div className="aspect-[4/3] bg-gradient-to-br from-primary-100 to-secondary-100 relative overflow-hidden">
+                  {theme.previewImages && theme.previewImages.length > 0 ? (
+                    <img 
+                      src={theme.previewImages[0]} 
+                      alt={`${theme.name} preview`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.style.display = 'none'
+                        target.nextElementSibling?.classList.remove('hidden')
+                      }}
+                    />
+                  ) : null}
+                  <div className={`${theme.previewImages && theme.previewImages.length > 0 ? 'hidden' : 'flex'} items-center justify-center w-full h-full`}>
+                    <SparklesIcon className="h-16 w-16 text-primary-400" />
+                  </div>
+                  
+                  {/* Preview overlay */}
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white bg-opacity-90 rounded-full p-3">
+                      <PhotoIcon className="h-6 w-6 text-gray-700" />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">{theme.name}</h3>
+                  <p className="text-gray-600 text-sm mb-4">{theme.description}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="inline-block px-3 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800 capitalize">
+                      {theme.category}
+                    </span>
+                    <span className="text-xs text-primary-600 font-medium">Click to preview</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-center mt-12">
+            {!user ? (
+              <Link href="/sign-up" className="inline-flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-200 shadow-lg hover:shadow-xl">
+                <SparklesIcon className="h-5 w-5" />
+                <span>Start Creating</span>
+              </Link>
+            ) : (
+              <Link href="/create" className="inline-flex items-center space-x-2 bg-primary-600 hover:bg-primary-700 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-200 shadow-lg hover:shadow-xl">
+                <SparklesIcon className="h-5 w-5" />
+                <span>Create Photoshoot</span>
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -569,6 +672,14 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      {/* Theme Preview Modal */}
+      <ThemePreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        theme={previewTheme}
+        showSelectButton={false}
+      />
     </div>
   )
 }

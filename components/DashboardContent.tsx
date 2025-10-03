@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { 
   PlusIcon, 
@@ -10,11 +11,15 @@ import {
   CameraIcon,
   BanknotesIcon,
   CogIcon,
-  BookOpenIcon
+  BookOpenIcon,
+  TrashIcon,
+  EllipsisVerticalIcon,
+  RectangleStackIcon
 } from '@heroicons/react/24/outline'
 import { CreditProvider } from '@/contexts/CreditContext'
 import UserMenu from '@/components/UserMenu'
 import DashboardCreditDisplay from '@/components/DashboardCreditDisplay'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 interface DashboardContentProps {
   user: any
@@ -26,11 +31,135 @@ interface DashboardContentProps {
 
 export default function DashboardContent({
   user,
-  creditBalance,
+  creditBalance: initialCreditBalance,
   hasAdminAccess,
-  children,
-  sessions
+  children: initialChildren,
+  sessions: initialSessions
 }: DashboardContentProps) {
+  const [dashboardData, setDashboardData] = useState({
+    children: initialChildren || [],
+    sessions: initialSessions || [],
+    creditBalance: initialCreditBalance,
+    usage: {
+      totalSessions: initialSessions?.length || 0,
+      thisMonthSessions: 0
+    }
+  })
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean
+    type: 'session' | 'child'
+    id: string
+    name: string
+  }>({ isOpen: false, type: 'session', id: '', name: '' })
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Auto-refresh dashboard data every 10 seconds
+  useEffect(() => {
+    const refreshDashboard = async () => {
+      try {
+        setIsRefreshing(true)
+        const response = await fetch('/api/dashboard')
+        if (response.ok) {
+          const data = await response.json()
+          setDashboardData(data)
+        }
+      } catch (error) {
+        console.error('Failed to refresh dashboard:', error)
+      } finally {
+        setIsRefreshing(false)
+      }
+    }
+
+    // Refresh immediately on mount to get latest data
+    refreshDashboard()
+
+    // Set up polling every 10 seconds
+    const interval = setInterval(refreshDashboard, 10000)
+    
+    // Also refresh when user returns to tab
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshDashboard()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
+  const { children, sessions, creditBalance } = dashboardData
+
+  const handleDeleteSession = async (sessionId: string) => {
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/photoshoot/${sessionId}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        // Remove the session from local state
+        setDashboardData(prev => ({
+          ...prev,
+          sessions: prev.sessions.filter((s: any) => s.id !== sessionId),
+          usage: {
+            ...prev.usage,
+            totalSessions: prev.usage.totalSessions - 1
+          }
+        }))
+        setDeleteDialog({ isOpen: false, type: 'session', id: '', name: '' })
+      } else {
+        const error = await response.json()
+        alert(`Failed to delete session: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Delete session error:', error)
+      alert('Failed to delete session. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeleteChild = async (childId: string) => {
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/children/${childId}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        // Remove the child from local state
+        setDashboardData(prev => ({
+          ...prev,
+          children: prev.children.filter((c: any) => c.id !== childId)
+        }))
+        setDeleteDialog({ isOpen: false, type: 'child', id: '', name: '' })
+      } else {
+        const error = await response.json()
+        alert(`Failed to delete child profile: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Delete child error:', error)
+      alert('Failed to delete child profile. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const openDeleteDialog = (type: 'session' | 'child', id: string, name: string) => {
+    setDeleteDialog({ isOpen: true, type, id, name })
+  }
+
+  const handleConfirmDelete = () => {
+    if (deleteDialog.type === 'session') {
+      handleDeleteSession(deleteDialog.id)
+    } else {
+      handleDeleteChild(deleteDialog.id)
+    }
+  }
   
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -74,7 +203,17 @@ export default function DashboardContent({
               </div>
               
               <div className="flex items-center space-x-4">
+                {isRefreshing && (
+                  <div className="flex items-center text-sm text-gray-500">
+                    <ClockIcon className="h-4 w-4 animate-spin mr-1" />
+                    Refreshing...
+                  </div>
+                )}
                 <DashboardCreditDisplay />
+                <Link href="/gallery" className="btn-secondary">
+                  <RectangleStackIcon className="h-5 w-5 mr-2" />
+                  Gallery
+                </Link>
                 <Link href="/albums" className="btn-secondary">
                   <BookOpenIcon className="h-5 w-5 mr-2" />
                   Albums
@@ -85,8 +224,8 @@ export default function DashboardContent({
                     Admin
                   </Link>
                 )}
-                <Link href={creditBalance > 0 ? "/create" : "/billing"} className="btn-primary">
-                  {creditBalance > 0 ? (
+                <Link href={dashboardData.creditBalance > 0 ? "/create" : "/billing"} className="btn-primary">
+                  {dashboardData.creditBalance > 0 ? (
                     <>
                       <PlusIcon className="h-5 w-5 mr-2" />
                       New Photoshoot
@@ -154,7 +293,7 @@ export default function DashboardContent({
                         Total Sessions
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        {sessions?.length || 0}
+                        {dashboardData.usage.totalSessions}
                       </dd>
                     </dl>
                   </div>
@@ -174,7 +313,7 @@ export default function DashboardContent({
                         Completed
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        {sessions?.filter((s: any) => s.status === 'completed').length || 0}
+                        {sessions.filter((s: any) => s.status === 'completed').length}
                       </dd>
                     </dl>
                   </div>
@@ -194,7 +333,7 @@ export default function DashboardContent({
                         Children
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        {children?.length || 0}
+                        {children.length}
                       </dd>
                     </dl>
                   </div>
@@ -214,7 +353,7 @@ export default function DashboardContent({
                         Credits
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        {creditBalance}
+                        {dashboardData.creditBalance}
                       </dd>
                     </dl>
                   </div>
@@ -228,9 +367,14 @@ export default function DashboardContent({
             <div className="mb-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">Recent Photoshoots</h3>
-                <Link href={creditBalance > 0 ? "/create" : "/billing"} className="text-primary-600 hover:text-primary-700 font-medium">
-                  {creditBalance > 0 ? "Create New" : "Buy Credits"}
-                </Link>
+                <div className="flex items-center space-x-4">
+                  <Link href="/gallery" className="text-primary-600 hover:text-primary-700 font-medium">
+                    View All in Gallery
+                  </Link>
+                  <Link href={dashboardData.creditBalance > 0 ? "/create" : "/billing"} className="text-primary-600 hover:text-primary-700 font-medium">
+                    {dashboardData.creditBalance > 0 ? "Create New" : "Buy Credits"}
+                  </Link>
+                </div>
               </div>
 
               <div className="grid gap-6 lg:grid-cols-2">
@@ -276,13 +420,22 @@ export default function DashboardContent({
                           <span className="text-xs text-gray-500">
                             {getStatusText(session.status)}
                           </span>
-                          <Link 
-                            href={`/session/${session.id}`}
-                            className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                            prefetch={true}
-                          >
-                            View Details
-                          </Link>
+                          <div className="flex items-center space-x-2">
+                            <Link 
+                              href={`/session/${session.id}`}
+                              className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                              prefetch={true}
+                            >
+                              View Details
+                            </Link>
+                            <button
+                              onClick={() => openDeleteDialog('session', session.id, session.children?.name || 'Family Session')}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                              title="Delete photoshoot"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -297,8 +450,8 @@ export default function DashboardContent({
             <div className="mb-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-semibold text-gray-900">Your Children</h3>
-                <Link href={creditBalance > 0 ? "/children/new" : "/billing"} className="text-primary-600 hover:text-primary-700 font-medium">
-                  {creditBalance > 0 ? "Add Child" : "Buy Credits"}
+                <Link href={dashboardData.creditBalance > 0 ? "/children/new" : "/billing"} className="text-primary-600 hover:text-primary-700 font-medium">
+                  {dashboardData.creditBalance > 0 ? "Add Child" : "Buy Credits"}
                 </Link>
               </div>
 
@@ -317,11 +470,18 @@ export default function DashboardContent({
                     
                     <div className="flex space-x-3">
                       <Link 
-                        href={creditBalance > 0 ? `/create?child=${child.id}` : "/billing"}
-                        className={`text-sm flex-1 text-center ${creditBalance > 0 ? "btn-primary" : "btn-secondary"}`}
+                        href={dashboardData.creditBalance > 0 ? `/create?child=${child.id}` : "/billing"}
+                        className={`text-sm flex-1 text-center ${dashboardData.creditBalance > 0 ? "btn-primary" : "btn-secondary"}`}
                       >
-                        {creditBalance > 0 ? "New Shoot" : "Buy Credits"}
+                        {dashboardData.creditBalance > 0 ? "New Shoot" : "Buy Credits"}
                       </Link>
+                      <button
+                        onClick={() => openDeleteDialog('child', child.id, child.name)}
+                        className="text-gray-400 hover:text-red-500 transition-colors p-2"
+                        title="Delete child profile"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -330,6 +490,22 @@ export default function DashboardContent({
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, type: 'session', id: '', name: '' })}
+        onConfirm={handleConfirmDelete}
+        title={`Delete ${deleteDialog.type === 'session' ? 'Photoshoot' : 'Child Profile'}`}
+        message={
+          deleteDialog.type === 'session'
+            ? `Are you sure you want to delete the photoshoot for "${deleteDialog.name}"? This will permanently delete all generated images and cannot be undone.`
+            : `Are you sure you want to delete the profile for "${deleteDialog.name}"? This action cannot be undone. Note: You must delete all associated photoshoots first.`
+        }
+        confirmText="Delete"
+        isLoading={isDeleting}
+        type="danger"
+      />
     </CreditProvider>
   )
 }

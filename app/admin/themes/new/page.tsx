@@ -12,14 +12,14 @@ export default async function NewTheme() {
   const { data: { session } } = await supabase.auth.getSession()
   
   if (!session) {
-    redirect('/sign-in')
+    return redirect('/sign-in')
   }
 
   const user = session.user
   const hasAdminAccess = await isAdmin(user.id)
   
   if (!hasAdminAccess) {
-    redirect('/dashboard')
+    return redirect('/dashboard')
   }
 
   return (

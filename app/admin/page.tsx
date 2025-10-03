@@ -70,14 +70,14 @@ export default async function AdminDashboard() {
   const { data: { session } } = await supabase.auth.getSession()
   
   if (!session) {
-    redirect('/sign-in')
+    return redirect('/sign-in')
   }
 
   const user = session.user
   const hasAdminAccess = await isAdmin(user.id)
   
   if (!hasAdminAccess) {
-    redirect('/dashboard')
+    return redirect('/dashboard')
   }
 
   const { stats, recentSessions, themes } = await getAdminData(user.id)

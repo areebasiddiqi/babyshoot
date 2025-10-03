@@ -1,6 +1,6 @@
-import { redirect } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { SparklesIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
+import { SparklesIcon, ArrowLeftIcon, PhotoIcon } from '@heroicons/react/24/outline'
 import { supabaseAdmin } from '@/lib/supabase'
 import { isAdmin } from '@/lib/admin-utils'
 import UserMenu from '@/components/UserMenu'
@@ -31,21 +31,21 @@ export default async function EditTheme({ params }: { params: { themeId: string 
   const { data: { session } } = await supabase.auth.getSession()
   
   if (!session) {
-    redirect('/sign-in')
+    return redirect('/sign-in')
   }
 
   const user = session.user
   const hasAdminAccess = await isAdmin(user.id)
   
   if (!hasAdminAccess) {
-    redirect('/dashboard')
+    return redirect('/dashboard')
   }
 
   let theme
   try {
     theme = await getTheme(params.themeId)
   } catch (error) {
-    redirect('/admin/themes')
+    return notFound()
   }
 
   return (
@@ -57,13 +57,16 @@ export default async function EditTheme({ params }: { params: { themeId: string 
             <div className="flex items-center space-x-4">
               <Link href="/admin" className="flex items-center space-x-2">
                 <SparklesIcon className="h-8 w-8 text-primary-500" />
-                <span className="text-xl font-bold gradient-text">Admin</span>
               </Link>
               <div className="hidden sm:block text-gray-300">|</div>
               <h1 className="hidden sm:block text-xl font-semibold text-gray-900">Edit Theme</h1>
             </div>
             
             <div className="flex items-center space-x-4">
+              <Link href={`/admin/themes/${params.themeId}/preview-images`} className="btn-secondary">
+                <PhotoIcon className="h-4 w-4 mr-2" />
+                Preview Images
+              </Link>
               <Link href="/admin/themes" className="btn-secondary">
                 <ArrowLeftIcon className="h-4 w-4 mr-2" />
                 Back to Themes

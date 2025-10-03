@@ -27,6 +27,7 @@ export class AstriaAPI {
       formData.append('tune[base_tune_id]', '1504944') // Flux1.dev base model ID
       formData.append('tune[model_type]', 'lora') // LoRA model type
       formData.append('tune[token]', 'ohwx') // Token for prompts
+      formData.append('tune[steps]', '300') // Force training steps to 300 to keep costs low
       
       // Add images as files (nested under tune[images][])
       for (let i = 0; i < imageDataUrls.length; i++) {
@@ -84,7 +85,7 @@ export class AstriaAPI {
         prompt: {
           text: prompt,
           num_images: numImages,
-          steps: 300,
+          // steps: removed - Astria recommends not setting this and using their default
           cfg_scale: 4, // Must be less than 5 according to Astria API
           seed: -1, // Random seed
           super_resolution: true,

@@ -14,16 +14,18 @@ import {
   XMarkIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
-  CloudArrowUpIcon
+  CloudArrowUpIcon,
+  EyeIcon
 } from '@heroicons/react/24/outline'
 import { FormData as ChildFormData, UploadedFile, Theme, Child } from '@/types'
 import { validateImageFile, generateBasePrompt } from '@/lib/utils'
 import { useAppConfig } from '@/hooks/useAppConfig'
+import ThemePreviewModal from '@/components/ThemePreviewModal'
 
 const steps = [
   { id: 1, name: 'Session Type', description: 'Choose photoshoot type' },
   { id: 2, name: 'Profile Setup', description: 'Add participant details' },
-  { id: 3, name: 'Upload Photos', description: 'Share 5-10 clear photos' },
+  { id: 3, name: 'Upload Photos', description: 'Share 5-15 clear photos' },
   { id: 4, name: 'Choose Theme', description: 'Pick a magical theme' },
   { id: 5, name: 'Review & Create', description: 'Start the magic!' }
 ]
@@ -78,6 +80,8 @@ function CreatePhotoshootContent() {
   const [themes, setThemes] = useState<Theme[]>([])
   const [isLoadingThemes, setIsLoadingThemes] = useState(false)
   const [isLoadingChildData, setIsLoadingChildData] = useState(false)
+  const [previewTheme, setPreviewTheme] = useState<Theme | null>(null)
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false)
   
   // Family session states
   const [familyMembers, setFamilyMembers] = useState([
@@ -267,6 +271,16 @@ function CreatePhotoshootContent() {
       setIsLoadingThemes(false)
     }
   }
+
+  const handlePreviewTheme = (theme: Theme) => {
+    setPreviewTheme(theme)
+    setIsPreviewModalOpen(true)
+  }
+
+  const handleSelectThemeFromPreview = (theme: Theme) => {
+    setSelectedTheme(theme)
+    setIsPreviewModalOpen(false)
+  }
   const onDrop = (acceptedFiles: File[]) => {
     const newFiles: UploadedFile[] = acceptedFiles.map(file => {
       const validation = validateImageFile(file)
@@ -282,7 +296,7 @@ function CreatePhotoshootContent() {
       }
     }).filter(Boolean) as UploadedFile[]
 
-    setUploadedFiles(prev => [...prev, ...newFiles].slice(0, 10))
+    setUploadedFiles(prev => [...prev, ...newFiles].slice(0, 15))
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -290,7 +304,7 @@ function CreatePhotoshootContent() {
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.webp']
     },
-    maxFiles: 10,
+    maxFiles: 15,
     multiple: true
   })
 
@@ -952,7 +966,7 @@ function CreatePhotoshootContent() {
             <div className="card">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Upload Photos</h2>
               <p className="text-gray-600 mb-6">
-                Upload 5-10 clear photos {sessionType === 'child' ? 'of your child' : 'of your family members'} from different angles. This helps our AI create better results.
+                Upload 5-15 clear photos {sessionType === 'child' ? 'of your child' : 'of your family members'} from different angles. This helps our AI create better results.
               </p>
 
               <div
@@ -977,7 +991,7 @@ function CreatePhotoshootContent() {
               {uploadedFiles.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">
-                    Photos ({uploadedFiles.length}/10)
+                    Photos ({uploadedFiles.length}/15)
                     {uploadedFiles.some(f => f.isExisting) && (
                       <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
                         Reusing existing photos
@@ -1055,31 +1069,64 @@ function CreatePhotoshootContent() {
                   ))
                 ) : (
                   themes.map((theme) => (
-                  <button
+                  <div
                     key={theme.id}
-                    type="button"
-                    onClick={() => setSelectedTheme(theme)}
-                    className={`p-6 border-2 rounded-xl text-left transition-all ${
+                    className={`relative p-6 border-2 rounded-xl transition-all ${
                       selectedTheme?.id === theme.id
                         ? 'border-primary-500 bg-primary-50'
                         : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
                     }`}
                   >
-                    <div className="aspect-video bg-gradient-to-br from-primary-100 to-secondary-100 rounded-lg mb-4 flex items-center justify-center">
-                      <SparklesIcon className="h-12 w-12 text-primary-400" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{theme.name}</h3>
-                    <p className="text-gray-600 text-sm">{theme.description}</p>
-                    <div className="mt-3">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                        selectedTheme?.id === theme.id
-                          ? 'bg-primary-100 text-primary-800'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {theme.category}
-                      </span>
-                    </div>
-                  </button>
+                    {/* Preview Button */}
+                    <button
+                      type="button"
+                      onClick={() => handlePreviewTheme(theme)}
+                      className="absolute top-4 right-4 w-8 h-8 bg-white bg-opacity-90 hover:bg-opacity-100 rounded-full flex items-center justify-center shadow-sm transition-all z-10"
+                      title="Preview theme"
+                    >
+                      <EyeIcon className="h-4 w-4 text-gray-600" />
+                    </button>
+
+                    {/* Main Theme Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTheme(theme)}
+                      className="w-full text-left"
+                    >
+                      <div className="aspect-video bg-gradient-to-br from-primary-100 to-secondary-100 rounded-lg mb-4 flex items-center justify-center relative overflow-hidden">
+                        {theme.previewImages && theme.previewImages.length > 0 ? (
+                          <img 
+                            src={theme.previewImages[0]} 
+                            alt={`${theme.name} preview`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.style.display = 'none'
+                              target.nextElementSibling?.classList.remove('hidden')
+                            }}
+                          />
+                        ) : null}
+                        <div className={`${theme.previewImages && theme.previewImages.length > 0 ? 'hidden' : 'flex'} items-center justify-center w-full h-full`}>
+                          <SparklesIcon className="h-12 w-12 text-primary-400" />
+                        </div>
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">{theme.name}</h3>
+                      <p className="text-gray-600 text-sm">{theme.description}</p>
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                          selectedTheme?.id === theme.id
+                            ? 'bg-primary-100 text-primary-800'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {theme.category}
+                        </span>
+                        <span className="text-xs text-gray-500 flex items-center">
+                          <EyeIcon className="h-3 w-3 mr-1" />
+                          Preview
+                        </span>
+                      </div>
+                    </button>
+                  </div>
                   ))
                 )}
                 </div>
@@ -1251,6 +1298,15 @@ function CreatePhotoshootContent() {
             )}
           </div>
         </form>
+
+        {/* Theme Preview Modal */}
+        <ThemePreviewModal
+          isOpen={isPreviewModalOpen}
+          onClose={() => setIsPreviewModalOpen(false)}
+          theme={previewTheme}
+          onSelectTheme={handleSelectThemeFromPreview}
+          showSelectButton={true}
+        />
       </div>
     </div>
   )
