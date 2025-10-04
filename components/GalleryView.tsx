@@ -166,7 +166,7 @@ export default function GalleryView({ sessions: initialSessions }: GalleryViewPr
             <MagnifyingGlassIcon className="h-5 w-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search by child name or theme..."
+              placeholder="Search by child name, family, or theme..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="input-field pl-10"
