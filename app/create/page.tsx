@@ -146,7 +146,15 @@ function CreatePhotoshootContent() {
       if (child) {
         setSelectedChild(child)
         setValue('childName', child.name)
-        setValue('ageInMonths', child.age_in_months || child.ageInMonths || 0)
+        
+        // Convert total months to years and months
+        const totalMonths = child.age_in_months || child.ageInMonths || 0
+        const years = Math.floor(totalMonths / 12)
+        const months = totalMonths % 12
+        
+        setValue('ageInMonths', totalMonths)
+        setValue('ageYears', years)
+        setValue('ageMonths', months)
         setValue('gender', child.gender)
         setValue('hairColor', child.hair_color || child.hairColor || '')
         setValue('hairStyle', child.hair_style || child.hairStyle || '')
@@ -211,7 +219,15 @@ function CreatePhotoshootContent() {
           if (child) {
             setSelectedChild(child)
             setValue('childName', child.name)
-            setValue('ageInMonths', child.age_in_months || child.ageInMonths || 0)
+            
+            // Convert total months to years and months
+            const totalMonths = child.age_in_months || child.ageInMonths || 0
+            const years = Math.floor(totalMonths / 12)
+            const months = totalMonths % 12
+            
+            setValue('ageInMonths', totalMonths)
+            setValue('ageYears', years)
+            setValue('ageMonths', months)
             setValue('gender', child.gender)
             setValue('hairColor', child.hair_color || child.hairColor || '')
             setValue('hairStyle', child.hair_style || child.hairStyle || '')
@@ -322,7 +338,15 @@ function CreatePhotoshootContent() {
   const selectExistingChild = (child: Child) => {
     setSelectedChild(child)
     setValue('childName', child.name)
-    setValue('ageInMonths', child.ageInMonths || child.age_in_months || 0)
+    
+    // Convert total months to years and months
+    const totalMonths = child.ageInMonths || child.age_in_months || 0
+    const years = Math.floor(totalMonths / 12)
+    const months = totalMonths % 12
+    
+    setValue('ageInMonths', totalMonths) // Keep for backward compatibility
+    setValue('ageYears', years)
+    setValue('ageMonths', months)
     setValue('gender', child.gender)
     setValue('hairColor', child.hairColor || child.hair_color || '')
     setValue('hairStyle', child.hairStyle || child.hair_style || '')
@@ -403,11 +427,20 @@ function CreatePhotoshootContent() {
           }
         } else {
           // Use form data for new child
-          Object.entries(data).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-              formData.append(key, value.toString())
-            }
-          })
+          // Convert years and months to total months
+          const totalMonths = (data.ageYears || 0) * 12 + (data.ageMonths || 0)
+          
+          // Add all form fields
+          formData.append('childName', data.childName || '')
+          formData.append('ageInMonths', totalMonths.toString())
+          formData.append('gender', data.gender || '')
+          formData.append('hairColor', data.hairColor || '')
+          formData.append('hairStyle', data.hairStyle || '')
+          formData.append('eyeColor', data.eyeColor || '')
+          formData.append('skinTone', data.skinTone || '')
+          if (data.uniqueFeatures) {
+            formData.append('uniqueFeatures', data.uniqueFeatures)
+          }
         }
       } else if (sessionType === 'family') {
         formData.append('familyMembers', JSON.stringify(familyMembers))
@@ -500,8 +533,9 @@ function CreatePhotoshootContent() {
       case 2:
         if (sessionType === 'child') {
           const formData = watch()
-          return formData.childName && formData.ageInMonths && formData.gender && 
-                 formData.hairColor && formData.eyeColor && formData.skinTone
+          return formData.childName && 
+                 (formData.ageYears !== undefined && formData.ageMonths !== undefined) && 
+                 formData.gender && formData.hairColor && formData.eyeColor && formData.skinTone
         } else if (sessionType === 'family') {
           return familyMembers.every(member => member.name && member.relation && member.gender)
         }
@@ -715,22 +749,44 @@ function CreatePhotoshootContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Age in Months *
+                    Age *
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="120"
-                    {...register('ageInMonths', { 
-                      required: 'Age is required',
-                      min: { value: 0, message: 'Age must be positive' },
-                      max: { value: 120, message: 'Age must be less than 120 months' }
-                    })}
-                    className="input-field"
-                    placeholder="e.g., 6"
-                  />
-                  {errors.ageInMonths && (
-                    <p className="text-red-500 text-sm mt-1">{errors.ageInMonths.message}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        {...register('ageYears', { 
+                          required: 'Years is required',
+                          min: { value: 0, message: 'Years must be positive' },
+                          max: { value: 10, message: 'Years must be less than 10' }
+                        })}
+                        className="input-field"
+                        placeholder="Years"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Years</p>
+                    </div>
+                    <div>
+                      <input
+                        type="number"
+                        min="0"
+                        max="11"
+                        {...register('ageMonths', { 
+                          required: 'Months is required',
+                          min: { value: 0, message: 'Months must be positive' },
+                          max: { value: 11, message: 'Months must be less than 12' }
+                        })}
+                        className="input-field"
+                        placeholder="Months"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Months</p>
+                    </div>
+                  </div>
+                  {(errors.ageYears || errors.ageMonths) && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.ageYears?.message || errors.ageMonths?.message}
+                    </p>
                   )}
                 </div>
 

@@ -107,7 +107,9 @@ export interface AstriaGenerationJob {
 
 export interface FormData {
   childName: string
-  ageInMonths: number
+  ageInMonths: number // Keep for backward compatibility
+  ageYears: number
+  ageMonths: number
   gender: 'boy' | 'girl' | 'other'
   hairColor: string
   hairStyle: string
