@@ -186,6 +186,24 @@ export default function DashboardContent({
       default: return status
     }
   }
+
+  // Helper function to get the initial letter for session placeholder
+  const getSessionInitial = (session: any) => {
+    if (session.child_id && session.children?.name) {
+      // Child session - use child's name
+      return session.children.name.charAt(0).toUpperCase()
+    } else if (!session.child_id && session.base_prompt) {
+      // Family session - extract first family member name from base_prompt
+      // The base_prompt contains: "Family portrait featuring Name1 (relation, gender), Name2 (relation, gender)..."
+      const match = session.base_prompt.match(/featuring\s+([^(]+)\s*\(/)
+      if (match && match[1]) {
+        const firstName = match[1].trim()
+        return firstName.charAt(0).toUpperCase()
+      }
+    }
+    // Fallback to 'F' for Family or '?' for unknown
+    return session.child_id ? '?' : 'F'
+  }
   return (
     <CreditProvider initialBalance={creditBalance}>
       <div className="min-h-screen bg-gray-50">
@@ -446,7 +464,9 @@ export default function DashboardContent({
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-primary-100 to-secondary-100 rounded-l-lg flex items-center justify-center">
-                            <PhotoIcon className="h-8 w-8 text-primary-400" />
+                            <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-secondary-400 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                              {getSessionInitial(session)}
+                            </div>
                           </div>
                         )}
                       </div>

@@ -8,18 +8,28 @@ import {
   MagnifyingGlassIcon,
   CheckCircleIcon,
   ClockIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  TrashIcon,
+  EllipsisVerticalIcon
 } from '@heroicons/react/24/outline'
 import { formatRelativeTime } from '@/lib/utils'
+import ConfirmDialog from '@/components/ConfirmDialog'
 
 interface GalleryViewProps {
   sessions: any[]
 }
 
-export default function GalleryView({ sessions }: GalleryViewProps) {
+export default function GalleryView({ sessions: initialSessions }: GalleryViewProps) {
+  const [sessions, setSessions] = useState(initialSessions)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
+  const [deleteDialog, setDeleteDialog] = useState<{
+    isOpen: boolean
+    sessionId: string
+    sessionName: string
+  }>({ isOpen: false, sessionId: '', sessionName: '' })
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -47,10 +57,43 @@ export default function GalleryView({ sessions }: GalleryViewProps) {
     }
   }
 
+  const handleDeleteSession = async (sessionId: string) => {
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/photoshoot/${sessionId}`, {
+        method: 'DELETE',
+      })
+      
+      if (response.ok) {
+        // Remove the session from local state
+        setSessions(prev => prev.filter(s => s.id !== sessionId))
+        setDeleteDialog({ isOpen: false, sessionId: '', sessionName: '' })
+      } else {
+        const error = await response.json()
+        alert(`Failed to delete photoshoot: ${error.error}`)
+      }
+    } catch (error) {
+      console.error('Delete session error:', error)
+      alert('Failed to delete photoshoot. Please try again.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const openDeleteDialog = (sessionId: string, sessionName: string) => {
+    setDeleteDialog({ isOpen: true, sessionId, sessionName })
+  }
+
+  const handleConfirmDelete = () => {
+    handleDeleteSession(deleteDialog.sessionId)
+  }
+
   const filteredSessions = sessions
     .filter(session => {
-      const matchesSearch = session.children?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           session.themes?.name.toLowerCase().includes(searchTerm.toLowerCase())
+      const sessionName = session.child_id ? session.children?.name || '' : 'Family'
+      const themeName = session.themes?.name || ''
+      const matchesSearch = sessionName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           themeName.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesStatus = statusFilter === 'all' || session.status === statusFilter
       return matchesSearch && matchesStatus
     })
@@ -61,7 +104,9 @@ export default function GalleryView({ sessions }: GalleryViewProps) {
         case 'oldest':
           return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         case 'name':
-          return (a.children?.name || '').localeCompare(b.children?.name || '')
+          const aName = a.child_id ? a.children?.name || '' : 'Family'
+          const bName = b.child_id ? b.children?.name || '' : 'Family'
+          return aName.localeCompare(bName)
         default:
           return 0
       }
@@ -180,77 +225,95 @@ export default function GalleryView({ sessions }: GalleryViewProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSessions.map((session) => (
-            <Link 
+            <div 
               key={session.id} 
-              href={`/session/${session.id}`}
-              className="card hover:shadow-xl transition-all duration-200 group"
+              className="card hover:shadow-xl transition-all duration-200 group relative"
             >
-              {/* Image Preview */}
-              <div className="aspect-square bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl mb-4 overflow-hidden">
-                {session.generated_images && session.generated_images.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-1 h-full">
-                    {session.generated_images
-                      .filter((img: any) => img.status === 'completed')
-                      .slice(0, 4)
-                      .map((image: any, index: number) => (
-                        <img
-                          key={image.id}
-                          src={image.thumbnail_url || image.image_url}
-                          alt={`Generated photo ${index + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                      ))}
-                    {session.generated_images.filter((img: any) => img.status === 'completed').length === 0 && (
-                      <div className="col-span-2 flex items-center justify-center h-full">
-                        <PhotoIcon className="h-12 w-12 text-primary-400" />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <PhotoIcon className="h-12 w-12 text-primary-400" />
-                  </div>
-                )}
-              </div>
-              
-              {/* Session Info */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-900 truncate">
-                    {session.children?.name}'s Photoshoot
-                  </h3>
-                  {getStatusIcon(session.status)}
-                </div>
-                
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-600">
-                    Theme: {session.themes?.name || 'Custom'}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Created: {formatRelativeTime(new Date(session.created_at))}
-                  </p>
-                  {session.generated_images && (
-                    <p className="text-sm text-gray-600">
-                      Images: {session.generated_images.filter((img: any) => img.status === 'completed').length} completed
-                    </p>
+              {/* Delete Button */}
+              <button
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  openDeleteDialog(
+                    session.id, 
+                    session.child_id ? session.children?.name || 'Child Session' : 'Family Session'
+                  )
+                }}
+                className="absolute top-3 right-3 z-10 p-2 bg-white/90 hover:bg-white rounded-full shadow-sm hover:shadow-md transition-all duration-200 opacity-0 group-hover:opacity-100"
+                title="Delete photoshoot"
+              >
+                <TrashIcon className="h-4 w-4 text-gray-600 hover:text-red-500 transition-colors" />
+              </button>
+
+              {/* Clickable Link Area */}
+              <Link href={`/session/${session.id}`} className="block">
+                {/* Image Preview */}
+                <div className="aspect-square bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl mb-4 overflow-hidden">
+                  {session.generated_images && session.generated_images.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-1 h-full">
+                      {session.generated_images
+                        .filter((img: any) => img.status === 'completed')
+                        .slice(0, 4)
+                        .map((image: any, index: number) => (
+                          <img
+                            key={image.id}
+                            src={image.thumbnail_url || image.image_url}
+                            alt={`Generated photo ${index + 1}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                        ))}
+                      {session.generated_images.filter((img: any) => img.status === 'completed').length === 0 && (
+                        <div className="col-span-2 flex items-center justify-center h-full">
+                          <PhotoIcon className="h-12 w-12 text-primary-400" />
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <PhotoIcon className="h-12 w-12 text-primary-400" />
+                    </div>
                   )}
                 </div>
                 
-                <div className="flex items-center justify-between">
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    session.status === 'completed' ? 'bg-green-100 text-green-800' :
-                    session.status === 'failed' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {getStatusText(session.status)}
-                  </span>
+                {/* Session Info */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900 truncate">
+                      {session.child_id ? `${session.children?.name}'s Photoshoot` : 'Family Photoshoot'}
+                    </h3>
+                    {getStatusIcon(session.status)}
+                  </div>
                   
-                  <span className="text-xs text-gray-500">
-                    {new Date(session.created_at).toLocaleDateString()}
-                  </span>
+                  <div className="space-y-1">
+                    <p className="text-sm text-gray-600">
+                      Theme: {session.themes?.name || 'Custom'}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Created: {formatRelativeTime(new Date(session.created_at))}
+                    </p>
+                    {session.generated_images && (
+                      <p className="text-sm text-gray-600">
+                        Images: {session.generated_images.filter((img: any) => img.status === 'completed').length} completed
+                      </p>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      session.status === 'completed' ? 'bg-green-100 text-green-800' :
+                      session.status === 'failed' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {getStatusText(session.status)}
+                    </span>
+                    
+                    <span className="text-xs text-gray-500">
+                      {new Date(session.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Link>
+              </Link>
+            </div>
           ))}
         </div>
       )}
@@ -263,6 +326,18 @@ export default function GalleryView({ sessions }: GalleryViewProps) {
           </p>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteDialog.isOpen}
+        onClose={() => setDeleteDialog({ isOpen: false, sessionId: '', sessionName: '' })}
+        onConfirm={handleConfirmDelete}
+        title="Delete Photoshoot"
+        message={`Are you sure you want to delete the photoshoot for "${deleteDialog.sessionName}"? This will permanently delete all generated images and cannot be undone.`}
+        confirmText="Delete"
+        isLoading={isDeleting}
+        type="danger"
+      />
     </div>
   )
 }
